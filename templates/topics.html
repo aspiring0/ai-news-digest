@@ -1,26 +1,7 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>主题 · AI 资讯聚合</title>
-<style>
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; background: #f7f7f8; color: #222; }
-  nav { margin-bottom: 12px; }
-  nav a { margin-right: 16px; text-decoration: none; color: #1a73e8; font-weight: 600; }
-  nav a.active { color: #111; }
-  h1 { font-size: 22px; }
-  h2.cat { font-size: 16px; margin: 22px 0 10px; color: #333; border-left: 4px solid #1a73e8; padding-left: 8px; }
-  .item { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-  .item a.title { font-size: 16px; font-weight: 600; color: #111; text-decoration: none; cursor: pointer; }
-  .item a.title:hover { color: #1a73e8; }
-  .meta { margin-top: 6px; font-size: 12px; color: #888; }
-  .score { display: inline-block; background: #fef3e2; color: #b45309; border-radius: 4px; padding: 1px 8px; font-weight: 700; margin-right: 8px; }
-  .hint { color: #666; font-size: 13px; }
-</style>
-</head>
-<body>
-{% set active = "topics" %}{% include "_nav.html" %}
+{% extends "_base.html" %}
+{% block title %}主题 · AI 资讯聚合{% endblock %}
+{% block nav_active %}topics{% endblock %}
+{% block content %}
 <h1>🏷️ 主题分类</h1>
 <p class="hint">近 3 天条目，按关键词规则分类（规则在 <code>app/classifier.py</code>，改关键词只改那一个文件）。</p>
 {% for cat, cat_items in grouped.items() %}
@@ -32,6 +13,4 @@
     <p class="hint">暂无</p>
   {% endif %}
 {% endfor %}
-{% include "_summary_modal.html" %}
-</body>
-</html>
+{% endblock %}

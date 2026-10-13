@@ -1,31 +1,12 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>收藏 · AI 资讯聚合</title>
-<style>
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; background: #f7f7f8; color: #222; }
-  nav { margin-bottom: 12px; }
-  nav a { margin-right: 16px; text-decoration: none; color: #1a73e8; font-weight: 600; }
-  nav a.active { color: #111; }
-  h1 { font-size: 22px; }
-  .item { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-  .item a.title { font-size: 16px; font-weight: 600; color: #111; text-decoration: none; cursor: pointer; }
-  .item a.title:hover { color: #1a73e8; }
-  .meta { margin-top: 6px; font-size: 12px; color: #888; }
-  .empty { color: #999; padding: 40px 0; text-align: center; }
-</style>
-</head>
-<body>
-{% set active = "bookmarks" %}{% include "_nav.html" %}
+{% extends "_base.html" %}
+{% block title %}收藏 · AI 资讯聚合{% endblock %}
+{% block nav_active %}bookmarks{% endblock %}
+{% block content %}
 <h1>⭐ 收藏</h1>
-<p style="color:#666;font-size:13px">按收藏时间倒序。取消收藏后刷新页面即消失。</p>
+<p class="hint">按收藏时间倒序。取消收藏后刷新页面即消失。</p>
 {% if items %}
   {% for it in items %}{% include "_item.html" %}{% endfor %}
 {% else %}
   <div class="empty">还没有收藏。在热榜/时间线点 ☆ 即可收藏。</div>
 {% endif %}
-{% include "_summary_modal.html" %}
-</body>
-</html>
+{% endblock %}

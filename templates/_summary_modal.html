@@ -1,34 +1,44 @@
-<!-- 摘要弹窗：点击标题弹出；含四段式 + 原文链接 + 重新生成 -->
+<!-- 摘要弹窗：四段式（核心/说人话/关键细节/原文链接）+ 重新生成 + 关闭 -->
 <div id="sum-modal" class="modal hidden">
   <div class="modal-card">
     <div class="modal-head">
       <span id="sum-title" class="modal-title"></span>
-      <button class="modal-close" onclick="closeSummary()">✕</button>
+      <button class="modal-close" onclick="closeSummary()" aria-label="关闭">✕</button>
     </div>
     <div id="sum-body" class="modal-body"><p class="loading">正在生成摘要…</p></div>
     <div class="modal-foot">
       <button id="sum-regen" class="btn" onclick="regenSummary()">↻ 重新生成</button>
-      <a id="sum-link" class="btn link" href="#" target="_blank" rel="noopener">原文链接 ↗</a>
+      <a id="sum-link" class="btn link" href="#" target="_blank" rel="noopener">打开原文 ↗</a>
     </div>
   </div>
 </div>
 <style>
   .modal.hidden { display: none; }
-  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-  .modal-card { background: #fff; border-radius: 12px; max-width: 640px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; }
-  .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #eee; }
-  .modal-title { font-weight: 700; font-size: 15px; }
-  .modal-close { border: none; background: none; font-size: 18px; cursor: pointer; }
-  .modal-body { padding: 14px 16px; overflow-y: auto; font-size: 14px; line-height: 1.7; }
-  .modal-body h4 { margin: 12px 0 4px; font-size: 13px; color: #1a73e8; }
-  .modal-body h4:first-child { margin-top: 0; }
-  .modal-foot { padding: 12px 16px; border-top: 1px solid #eee; display: flex; gap: 10px; }
-  .btn { border: 1px solid #ddd; background: #f7f7f8; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; text-decoration: none; color: #222; }
-  .btn.link { color: #1a73e8; }
-  .loading { color: #999; }
-  .sum-err { color: #b91c1c; }
-  .sum-cached { font-size: 11px; color: #999; margin-top: 10px; }
-  .star { border: none; background: none; cursor: pointer; font-size: 16px; padding: 0 4px; }
+  .modal { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex;
+           align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .modal-card { background: #fff; border-radius: 12px; max-width: 640px; width: 100%;
+                max-height: 85vh; display: flex; flex-direction: column;
+                box-shadow: 0 20px 50px rgba(0,0,0,.2); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+                padding: 14px 16px; border-bottom: 1px solid var(--border, #e5e7eb); }
+  .modal-title { font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+  .modal-close { border: none; background: none; font-size: 18px; cursor: pointer;
+                 color: var(--muted, #6b7280); line-height: 1; flex-shrink: 0; }
+  .modal-body { padding: 4px 16px 14px; overflow-y: auto; font-size: 14px; line-height: 1.7; }
+  .sec { margin-top: 12px; }
+  .sec h4 { margin: 0 0 4px; font-size: 13px; color: var(--blue, #2563eb); }
+  .sec p { margin: 0; overflow-wrap: anywhere; }
+  .sum-link-section a { word-break: break-all; }
+  .sum-cached { font-size: 11px; color: #9ca3af; margin: 10px 0 0; }
+  .sum-err { color: #b91c1c; margin: 8px 0; }
+  .loading { color: #999; margin: 8px 0; }
+  .modal-foot { padding: 12px 16px; border-top: 1px solid var(--border, #e5e7eb);
+                display: flex; gap: 10px; }
+  .btn { border: 1px solid var(--border, #e5e7eb); background: #f9fafb; border-radius: 6px;
+         padding: 6px 14px; cursor: pointer; font-size: 13px; text-decoration: none; color: var(--text, #1f2328); }
+  .btn.link { color: var(--blue, #2563eb); }
+  .btn:hover { background: #f0f2f5; }
+  @media (max-width: 640px) { .modal { padding: 10px; } }
 </style>
 <script>
 let _sumUrl = "";
@@ -48,9 +58,10 @@ async function loadSummary(regen) {
     if (!d.ok) { body.innerHTML = '<p class="sum-err">摘要暂不可用（' + (d.message || "未知错误") + "）</p>"; return; }
     const s = d.summary;
     body.innerHTML =
-      "<h4>📌 一句话核心</h4><p>" + esc(s.core) + "</p>" +
-      "<h4>💬 说人话</h4><p>" + esc(s.plain) + "</p>" +
-      "<h4>🔑 关键细节</h4><p>" + esc(s.details).replace(/\n/g, "<br>") + "</p>" +
+      '<div class="sec"><h4>① 一句话核心</h4><p>' + esc(s.core) + "</p></div>" +
+      '<div class="sec"><h4>② 说人话</h4><p>' + esc(s.plain) + "</p></div>" +
+      '<div class="sec"><h4>③ 关键细节</h4><p>' + esc(s.details).replace(/\n/g, "<br>") + "</p></div>" +
+      '<div class="sec sum-link-section"><h4>④ 原文链接</h4><p><a href="' + esc(_sumUrl) + '" target="_blank" rel="noopener">' + esc(_sumUrl) + "</a></p></div>" +
       (s._cached ? '<p class="sum-cached">来自缓存（' + esc(s._created_at || "") + "）</p>" : "");
   } catch (e) {
     body.innerHTML = '<p class="sum-err">摘要暂不可用（网络错误）</p>';
@@ -63,6 +74,9 @@ function regenSummary() {
 function closeSummary() { document.getElementById("sum-modal").classList.add("hidden"); }
 document.getElementById("sum-modal").addEventListener("click", function(e) {
   if (e.target === this) closeSummary();
+});
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") closeSummary();
 });
 async function toggleBookmark(url, btn) {
   try {
@@ -79,4 +93,20 @@ function esc(s) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });
 }
+/* 相对时间：<time class="rel" datetime="ISO"> → 刚刚 / x 分钟前 / x 小时前 / 昨天 / x 天前 */
+function relTime(iso) {
+  const sec = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (sec < 60) return "刚刚";
+  const m = Math.floor(sec / 60);
+  if (m < 60) return m + " 分钟前";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + " 小时前";
+  const d = Math.floor(h / 24);
+  if (d === 1) return "昨天";
+  if (d < 15) return d + " 天前";
+  return new Date(iso).toLocaleDateString();
+}
+document.querySelectorAll("time.rel").forEach(function (t) {
+  t.textContent = relTime(t.getAttribute("datetime"));
+});
 </script>

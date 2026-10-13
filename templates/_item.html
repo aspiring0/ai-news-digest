@@ -1,6 +1,11 @@
-<div class="item">
-  <button class="star" title="收藏/取消" onclick='toggleBookmark({{ it.url|tojson }}, this)'>{{ "⭐" if it.bookmarked else "☆" }}</button>
+{% set ts = it.published_at or it.fetched_at or it.bookmarked_at %}
+<div class="item"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}>
   {% if it.hot_score is defined %}<span class="score">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
   <a class="title" href="javascript:void(0)" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>{{ it.title }}</a>
-  <div class="meta">{{ it.source_name }}{% if it.category is defined %} · {{ it.category }}{% endif %} · {{ it.published_at.strftime('%m-%d %H:%M') if it.published_at else (it.bookmarked_at.strftime('%m-%d %H:%M') if it.bookmarked_at is defined and it.bookmarked_at else '时间未知') }}{% if it.score is defined %} · 原始分 {{ "%.0f"|format(it.score) }}{% endif %}</div>
+  <button class="sum-btn" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>摘要</button>
+  <span class="spacer"></span>
+  <button class="star" title="收藏/取消" onclick='toggleBookmark({{ it.url|tojson }}, this)'>{{ "⭐" if it.bookmarked else "☆" }}</button>
+  <span class="meta">{{ it.source_name }}{% if it.category is defined %} · {{ it.category }}{% endif %} ·
+    {%- if ts %} <time class="rel" datetime="{{ ts.isoformat() }}">{{ ts.strftime('%m-%d %H:%M') }}</time>
+    {%- else %} 时间未知{% endif %}</span>
 </div>
