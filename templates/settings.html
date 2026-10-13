@@ -44,10 +44,10 @@
     <div class="row"><label>模型</label><input type="text" class="f-model" value="{{ p.model or '' }}" placeholder="如 deepseek-chat"></div>
     <div class="row"><label>key</label><input type="password" class="f-key" placeholder="修改地址时必须重新输入 key"></div>
     <div class="row">
-      <button class="btn primary" onclick="saveProvider('{{ p.id }}', {{ 'true' if p.builtin else 'false' }}, '{{ p.name }}')">保存</button>
-      <button class="btn" onclick="testProvider('{{ p.id }}')">测试连接</button>
-      {% if not p.is_default %}<button class="btn" onclick="setDefault('{{ p.id }}')">设为默认</button>{% endif %}
-      <button class="btn danger" onclick="delProvider('{{ p.id }}')">删除</button>
+      <button class="btn primary" onclick='saveProvider({{ p.id|tojson }}, {{ 'true' if p.builtin else 'false' }}, {{ p.name|tojson }})'>保存</button>
+      <button class="btn" onclick='testProvider({{ p.id|tojson }})'>测试连接</button>
+      {% if not p.is_default %}<button class="btn" onclick='setDefault({{ p.id|tojson }})'>设为默认</button>{% endif %}
+      <button class="btn danger" onclick='delProvider({{ p.id|tojson }})'>删除</button>
     </div>
     <div class="msg" id="msg-{{ p.id }}"></div>
   </div>
@@ -64,8 +64,8 @@
   <div class="row"><label>模型</label><input type="text" class="f-model" value="{{ meta.default_model }}"></div>
   <div class="row"><label>key</label><input type="password" class="f-key" placeholder="必填"></div>
   <div class="row">
-    <button class="btn primary" onclick="saveProvider('{{ pid }}', true, '{{ meta.name }}')">保存</button>
-    <button class="btn" onclick="testProvider('{{ pid }}')">测试连接</button>
+    <button class="btn primary" onclick='saveProvider({{ pid|tojson }}, true, {{ meta.name|tojson }})'>保存</button>
+    <button class="btn" onclick='testProvider({{ pid|tojson }})'>测试连接</button>
   </div>
   <div class="msg" id="msg-{{ pid }}"></div>
 </div>
@@ -111,6 +111,7 @@ async function saveCustom() {
   const base = card.querySelector(".f-base").value.trim();
   const key = card.querySelector(".f-key").value.trim();
   const model = card.querySelector(".f-model").value.trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(cid)) { msg("custom", "id 只能是英文字母/数字/横线/下划线（≤64 字符）", false); return; }
   if (!cid || !base || !key) { msg("custom", "id / 接口地址 / key 都不能为空", false); return; }
   const r = await fetch("/api/providers", {
     method: "POST", headers: {"Content-Type": "application/json"},

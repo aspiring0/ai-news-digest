@@ -1,13 +1,16 @@
 """模型 provider 管理：内置官方域名白名单 + 自定义 provider。
 
-安全规则（防 key 外发）：
+安全规则（防 key 外发 / 防注入）：
 1. 内置 provider 的 base_url 只能是官方域名（白名单校验）；
 2. 只有"自定义" provider 允许填任意域名；
-3. 修改已保存 provider 的 base_url 时，必须重新输入 key（前端+后端双校验）。
+3. 修改已保存 provider 的 base_url 时，必须重新输入 key（前端+后端双校验）；
+4. provider id 一律 `^[A-Za-z0-9_-]{1,64}$`（设置页模板把它拼进内联 JS，必须限字符集）；
+   Anthropic 官方无 OpenAI 兼容端点，不内置，请走"自定义"填中转地址。
 """
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -17,6 +20,9 @@ from . import db
 
 logger = logging.getLogger("ai-news-oss")
 
+# provider id 字符集（字母/数字/横线/下划线，≤64 位）
+_PROVIDER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
 # 内置 provider：官方域名白名单（精确匹配 host）
 BUILTIN_PROVIDERS = {
     "deepseek": {"name": "DeepSeek", "hosts": ["api.deepseek.com"], "default_model": "deepseek-chat"},
@@ -24,12 +30,16 @@ BUILTIN_PROVIDERS = {
     "qwen": {"name": "通义 Qwen", "hosts": ["dashscope.aliyuncs.com"], "default_model": "qwen-flash"},
     "kimi": {"name": "Kimi", "hosts": ["api.moonshot.cn"], "default_model": "kimi-k2"},
     "openai": {"name": "OpenAI", "hosts": ["api.openai.com"], "default_model": "gpt-4o-mini"},
-    "anthropic": {"name": "Anthropic", "hosts": ["api.anthropic.com"], "default_model": "claude-haiku-4-5"},
-    "gemini": {"name": "Gemini", "hosts": ["generativelanguage.googleapis.com"], "default_model": "gemini-2.0-flash"},
+    # Gemini 的 OpenAI 兼容端点在 /v1beta/openai/ 下，裸域名 base_url 自动补该前缀
+    "gemini": {
+        "name": "Gemini",
+        "hosts": ["generativelanguage.googleapis.com"],
+        "default_model": "gemini-2.0-flash",
+        "chat_prefix": "/v1beta/openai",
+    },
 }
 
-# 各家 chat 接口路径（都是 OpenAI-compatible 的 /chat/completions；Anthropic/Gemini 官方接口格式不同，
-# 建议用它们兼容 OpenAI 格式的中转地址，或走"自定义" provider 填兼容端点）
+# 各家 chat 接口路径（OpenAI-compatible 的 /chat/completions）
 CHAT_PATH = "/chat/completions"
 
 
@@ -60,8 +70,17 @@ def check_base_url(provider_id: str, base_url: str) -> None:
 
 
 def chat_url(provider_id: str, base_url: str) -> str:
-    """拼出 chat 接口完整 URL。"""
-    return base_url.rstrip("/") + CHAT_PATH
+    """拼出 chat 接口完整 URL。
+
+    内置 provider 可声明 chat_prefix（目前仅 Gemini 需要）：base_url 为裸域名
+    （无路径，即旧配置或默认填法）时自动补全前缀，显式填了前缀则不会重复拼接。
+    """
+    meta = BUILTIN_PROVIDERS.get(provider_id, {})
+    base = base_url.rstrip("/")
+    prefix = meta.get("chat_prefix", "")
+    if prefix and urlparse(base).path == "":
+        base += prefix
+    return base + CHAT_PATH
 
 
 def _now_iso() -> str:
@@ -77,10 +96,14 @@ def save_provider(
     name: str | None = None,
 ) -> None:
     """新增或更新 provider。base_url 变更时调用方必须已确认 key 被重新输入。"""
+    provider_id = (provider_id or "").strip()
+    if not _PROVIDER_ID_RE.fullmatch(provider_id):
+        raise ValueError("id 只能包含英文字母/数字/横线/下划线，长度 1-64")
     check_base_url(provider_id, base_url)
     if not api_key:
         raise ValueError("api_key 不能为空")
     meta = BUILTIN_PROVIDERS.get(provider_id, {})
+    name = (name or "").strip()[:64] or None
     with db._connect() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO provider_settings (id, name, builtin, base_url, api_key, model, is_default, updated_at)"
