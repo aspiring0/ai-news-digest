@@ -1,5 +1,17 @@
 # 更新日志
 
+## v0.3.3（2026-10-13）
+
+源池扩充：直接订阅 6 个原经 AIHOT 中转的上游源（先探 RSS 可用性再收录）
+
+- 新增 fetcher：Ars Technica AI / Hacker News AI（hnrss >100 赞）/ OpenAI /
+  Google DeepMind / IT之家（全站 feed + AI 关键词过滤，AI 分类 RSS 已 404）/
+  VentureBeat AI；源总数 10 → 16
+- The Decoder 探测被反爬挡（feed 路径返回 HTML），未收录，其内容仍经 AIHOT 兜底；
+  Anthropic/xAI/Amazon Science 无公开 RSS，同样靠 AIHOT 中转
+- 测试：fetcher 注册完整性（≥16 个、SOURCE_NAME/SCORE_CLASS/fetch 齐全且唯一）
+  + IT之家 AI 关键词过滤单测
+
 ## v0.3.2（2026-10-13）
 
 热榜打分修复（方案 D：多样性配额 + AIHOT 起步分修正）：
