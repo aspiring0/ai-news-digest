@@ -102,7 +102,7 @@ docker compose up -d --build
 
 `⚙️ 设置` 页管理模型 provider：
 
-- **内置 7 家**：DeepSeek / 智谱 GLM / 通义 Qwen / Kimi / OpenAI / Anthropic / Gemini，每家填 key + 模型名即可，接口地址默认官方域名。
+- **内置 6 家**：DeepSeek / 智谱 GLM / 通义 Qwen / Kimi / OpenAI / Gemini，每家填 key + 模型名即可，接口地址默认官方域名（Gemini 走其官方 OpenAI 兼容端点 `/v1beta/openai/`）。Anthropic 官方无 OpenAI 兼容端点，不内置，请用「自定义」填中转地址。
 - **自定义**：任意 OpenAI-compatible 地址（如自建中转），id 以 `custom-` 开头。
 - **一键测试连接**：保存前先点"测试连接"，确认 key 和模型名没填错。
 - **默认解读引擎**：设为默认的 provider 负责生成摘要。

@@ -1,5 +1,14 @@
 # 更新日志
 
+## v0.3.1（2026-10-13）
+
+安全修复与名实对齐（外部代码审查驱动）：
+
+- 修复设置页存储型 XSS：provider id 后端强校验 `^[A-Za-z0-9_-]{1,64}$`；模板 onclick 改用 `|tojson` 渲染 id/name，消除内联 JS 字符串逃逸（此前含引号的 id/name 经浏览器实体解码后可逃逸 `saveProvider(...)` 的 JS 字符串）
+- Gemini 内置 provider 改走官方 OpenAI 兼容端点 `/v1beta/openai/chat/completions`（此前拼 `/chat/completions` 恒 404，裸域名 base_url 自动补全前缀）；Anthropic 官方无 OpenAI 兼容端点，从内置列表移除（请走「自定义」填中转地址）
+- 补上 v0.3.0 承诺的 CI 与测试：GitHub Actions（Python 3.11/3.12 矩阵）+ pytest（健康检查/六页面/收藏链路/scorer/classifier/provider 安全规则，零网络）
+- 修复 docker-compose 在 `.env` 改 PORT 后端口映射错位的问题（容器内固定监听 8000）
+
 ## v0.3.0（2026-10-13）
 
 工程化收尾，目标是"开箱即用、别人也能装起来"：
