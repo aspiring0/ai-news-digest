@@ -174,6 +174,46 @@ def get_hot(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple
     return ranked[start:start + per_page], total
 
 
+def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple[list[dict], int]:
+    """故事级热榜：同一事件多源合并为一席（app/stories.py 聚类）。
+
+    - 故事热度 = 成员最高 hot_score × (1 + 15%/额外来源)（v0.3.5）
+    - 每来源（按代表条目来源计）最多 max_per_source 个故事
+    - 返回 (代表条目列表[带 _story 元数据], 故事总数)
+    """
+    from .stories import group_stories, story_score
+
+    with _connect() as conn:
+        rows = conn.execute("SELECT * FROM news_items").fetchall()
+    items = [_row_to_dict(r) for r in rows]
+    stories = group_stories(items)
+    for st in stories:
+        st["_score"] = story_score(st)
+    stories.sort(key=lambda s: s["_score"], reverse=True)
+
+    ranked: list[dict] = []
+    per_source: dict[str, int] = {}
+    for st in stories:
+        rep = dict(st["representative"])
+        src = rep["source_name"]
+        if per_source.get(src, 0) >= max_per_source:
+            continue
+        per_source[src] = per_source.get(src, 0) + 1
+        rep["hot_score"] = round(st["_score"], 2)
+        rep["_story"] = {
+            "count": len(st["members"]),
+            "sources": st["sources"],
+            "members": [
+                {"title": m["title"], "url": m["url"], "source_name": m["source_name"]}
+                for m in st["members"]
+            ],
+        }
+        ranked.append(rep)
+    total = len(ranked)
+    start = (max(1, page) - 1) * per_page
+    return ranked[start:start + per_page], total
+
+
 def get_timeline(page: int = 1, per_page: int = 20) -> tuple[list[dict], int]:
     """时间线：按发布时间倒序分页（无发布时间的按入库时间）。返回 (条目, 总数)。"""
     with _connect() as conn:

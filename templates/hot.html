@@ -13,7 +13,7 @@
 </section>
 {% endif %}
 <h1>今日热榜</h1>
-<p class="hint">按时间衰减热度排序。点击标题前往原文，「点开汇总」看 AI 解读。共 {{ stats.total }} 条在库。</p>
+<p class="hint">按故事热度排序（同一事件多源合并为一席，多源 +15%/源加成）。点击标题前往原文，「点开汇总」看 AI 解读。共 {{ stats.total }} 条在库。</p>
 {% if items %}
   {% include "_chips.html" %}
   {% for it in items %}{% set rank = loop.index + (page - 1) * 20 %}{% include "_item.html" %}{% endfor %}

@@ -58,8 +58,9 @@ def index():
 
 @app.get("/hot")
 def hot(request: Request, page: int = 1):
+    """热榜（故事级）：同一事件多源合并为一席，代表条目展示 + N 源报道徽标。"""
     page = max(1, page)
-    items, total = db.get_hot(page=page, per_page=PER_PAGE)
+    items, total = db.get_hot_stories(page=page, per_page=PER_PAGE)
     items = _mark_bookmarks(items)
     st = db.stats()
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)

@@ -2,15 +2,26 @@
 <div class="item" data-source="{{ it.source_name }}" data-title="{{ it.title }}"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}{% if it.hot_score is defined %} data-hot="{{ '%.2f'|format(it.hot_score) }}"{% endif %}>
   <div class="row-main">
     {% if rank is defined %}<span class="rank {{ 'r%d'|format(rank) if rank <= 3 else 'dim' }}" title="第 {{ rank }} 名">{{ '%02d'|format(rank) }}</span>{% endif %}
-    {% if it.hot_score is defined %}<span class="score" title="衰减热度分">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
+    {% if it.hot_score is defined %}<span class="score" title="{{ '故事热度（多源加成后）' if it._story is defined and it._story.count > 1 else '衰减热度分' }}">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
+    {% if it._story is defined and it._story.count > 1 %}<span class="story-badge" title="{{ it._story.sources|join(' / ') }}">⧉ {{ it._story.count }} 源报道</span>{% endif %}
     <a class="title" href="{{ it.url if it.url.startswith('http') else '#' }}" target="_blank" rel="noopener">{{ it.title }}</a>
     <span class="spacer"></span>
     <button class="star" title="收藏/取消" onclick='toggleBookmark({{ it.url|tojson }}, this)'>{{ "⭐" if it.bookmarked else "☆" }}</button>
   </div>
   <div class="row-sub">
     <button class="sum-btn" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>点开汇总 →</button>
-    <span class="meta">{{ it.source_name }}{% if it.category is defined and it.category %} · {{ it.category }}{% endif %} ·
+    <span class="meta">{{ it.source_name }}{% if it._story is defined and it._story.count > 1 %} 等 {{ it._story.count }} 条{% endif %}{% if it.category is defined and it.category %} · {{ it.category }}{% endif %} ·
       {%- if ts %} <time class="rel" datetime="{{ ts.isoformat() }}">{{ ts.strftime('%m-%d %H:%M') }}</time>
       {%- else %} 时间未知{% endif %}</span>
   </div>
+  {% if it._story is defined and it._story.count > 1 %}
+  <details class="story-members">
+    <summary>各源报道（{{ it._story.count }}）</summary>
+    <ul>
+      {% for m in it._story.members %}
+      <li><a href="{{ m.url if m.url.startswith('http') else '#' }}" target="_blank" rel="noopener">{{ m.title }}</a><span class="meta"> · {{ m.source_name }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
 </div>
