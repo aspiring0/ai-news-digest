@@ -5,7 +5,8 @@
 - hf 类（HuggingFace）：72 起，每位 -2，不低于 50
 - ph 类（ProductHunt/GitHub）：70 起，每位 -2，不低于 54
 - search 类（站点检索）：64 起，每位 -3，不低于 48
-- aihot：采用上游分，无则 50
+- aihot：采用上游分，无则按 rss 规则（66 起 -2/位，下限 48）——原固定 50 叠加
+  时间衰减后永远进不了热榜，v0.3.2 修复
 
 热榜分（读取时实时计算，原始分不动）：
     hot_score = score × 0.5^(age_hours / 48)
@@ -29,9 +30,15 @@ HALF_LIFE_HOURS = 48.0
 
 
 def static_score(score_class: str, position: int, upstream_score: float | None = None) -> float:
-    """按源内位置（0 起）算静态分。"""
+    """按源内位置（0 起）算静态分。
+
+    AIHOT：有上游分用上游分；其 RSS 不带分数时按 rss 规则起步，与其他新闻源
+    同一起跑线（原固定 50 导致 AIHOT 叠加衰减后永远进不了热榜，v0.3.2 修复）。
+    """
     if score_class == "aihot":
-        return float(upstream_score) if upstream_score else AIHOT_DEFAULT_SCORE
+        if upstream_score:
+            return float(upstream_score)
+        score_class = "rss"
     start, step, floor = SCORE_RULES.get(score_class, SCORE_RULES["rss"])
     return max(floor, start - step * position)
 

@@ -23,7 +23,10 @@ def test_static_score_other_classes():
 
 def test_static_score_aihot_uses_upstream():
     assert static_score("aihot", 0, upstream_score=88.0) == 88.0
-    assert static_score("aihot", 0, upstream_score=None) == 50.0
+    # v0.3.2 修复：RSS 不带上游分时按 rss 规则起步（原固定 50 导致 AIHOT 永远进不了热榜）
+    assert static_score("aihot", 0, upstream_score=None) == 66.0
+    assert static_score("aihot", 3, upstream_score=None) == 60.0
+    assert static_score("aihot", 50, upstream_score=None) == 48.0
 
 
 def test_hot_score_halves_after_48h():
