@@ -58,3 +58,10 @@ Homepage = "https://github.com/aspiring0/ai-news-oss"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # starlette 1.x 的 testclient 对 httpx 的弃用提示，与本项目无关
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
