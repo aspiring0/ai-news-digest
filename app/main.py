@@ -57,11 +57,16 @@ def index():
 
 
 @app.get("/hot")
-def hot(request: Request):
-    items = _mark_bookmarks(db.get_hot(limit=20))
+def hot(request: Request, page: int = 1):
+    page = max(1, page)
+    items, total = db.get_hot(page=page, per_page=PER_PAGE)
+    items = _mark_bookmarks(items)
     st = db.stats()
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
     return templates.TemplateResponse(
-        request, "hot.html", {"items": items, "stats": st}
+        request,
+        "hot.html",
+        {"items": items, "stats": st, "page": page, "total_pages": total_pages, "total": total},
     )
 
 
@@ -188,9 +193,8 @@ def api_save_provider(payload: dict):
     api_key = (payload.get("api_key") or "").strip()
     if not pid or not base_url:
         return JSONResponse({"ok": False, "message": "id 和 base_url 不能为空"}, status_code=400)
-    if not api_key:
-        # 修改 base_url 必须重输 key：后端强制每次保存都带 key
-        return JSONResponse({"ok": False, "message": "保存时必须输入 key（修改 base_url 必须重新输入 key）"}, status_code=400)
+    # api_key 允许留空：沿用已保存的 key（save_provider 内部校验：
+    # 新增必须给 key；修改 base_url 必须重输 key）
     try:
         providers.save_provider(
             pid,
@@ -230,6 +234,24 @@ def api_test_provider(payload: dict):
         provider_id=(payload.get("id") or "custom").strip(),
     )
     return result
+
+
+@app.post("/api/providers/models")
+def api_list_models(payload: dict):
+    """一键获取模型列表（后端代理，避免浏览器跨域）。body: {id, base_url, api_key?}。"""
+    return providers.list_models(
+        (payload.get("base_url") or "").strip(),
+        (payload.get("api_key") or "").strip(),
+        provider_id=(payload.get("id") or "custom").strip(),
+    )
+
+
+@app.post("/api/refetch")
+def api_refetch():
+    """手动触发一轮抓取（同步执行，约 10-30s），完成后前端刷新页面。"""
+    summary = run_once()
+    total = summary.get("_total", {})
+    return {"ok": True, "added": total.get("added", 0), "skipped": total.get("skipped", 0)}
 
 
 @app.get("/api/stats", include_in_schema=False)

@@ -90,16 +90,30 @@ def _now_iso() -> str:
 def save_provider(
     provider_id: str,
     base_url: str,
-    api_key: str,
+    api_key: str = "",
     model: str | None = None,
     builtin: bool = True,
     name: str | None = None,
 ) -> None:
-    """新增或更新 provider。base_url 变更时调用方必须已确认 key 被重新输入。"""
+    """新增或更新 provider。
+
+    Key 规则：留空 = 沿用已保存的 key（只改模型名等）；但新增 provider 必须给 key，
+    且修改接口地址（base_url 变化）时必须重输 key（防已存 key 被发往新域名）。
+    """
     provider_id = (provider_id or "").strip()
     if not _PROVIDER_ID_RE.fullmatch(provider_id):
         raise ValueError("id 只能包含英文字母/数字/横线/下划线，长度 1-64")
     check_base_url(provider_id, base_url)
+    with db._connect() as conn:
+        old = conn.execute(
+            "SELECT api_key, base_url FROM provider_settings WHERE id = ?", (provider_id,)
+        ).fetchone()
+        if not api_key:
+            if old is None:
+                raise ValueError("新增 provider 必须输入 key")
+            if old["base_url"] != base_url.rstrip("/"):
+                raise ValueError("修改接口地址必须重新输入 key")
+            api_key = old["api_key"]
     if not api_key:
         raise ValueError("api_key 不能为空")
     meta = BUILTIN_PROVIDERS.get(provider_id, {})
@@ -158,6 +172,36 @@ def get_default() -> dict | None:
     with db._connect() as conn:
         row = conn.execute("SELECT * FROM provider_settings WHERE is_default = 1").fetchone()
     return dict(row) if row else None
+
+
+def list_models(base_url: str, api_key: str = "", provider_id: str = "custom") -> dict:
+    """一键获取模型列表：后端代理请求 {base_url}/models（浏览器直连第三方会跨域）。
+
+    key 优先用入参；留空则回退到该 provider 已保存的 key。返回 {ok, models} 或 {ok, message}。
+    """
+    try:
+        check_base_url(provider_id, base_url)
+    except ValueError as e:
+        return {"ok": False, "message": str(e)}
+    key = api_key or ""
+    if not key:
+        saved = get_provider(provider_id)
+        key = saved["api_key"] if saved else ""
+    if not key:
+        return {"ok": False, "message": "请先填写 key（该 provider 也未保存过 key）"}
+    try:
+        resp = requests.get(
+            base_url.rstrip("/") + "/models",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=20,
+        )
+        if resp.status_code != 200:
+            return {"ok": False, "message": f"接口返回 {resp.status_code}（检查 key 是否有效）"}
+        data = resp.json()
+        ids = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
+        return {"ok": True, "models": ids[:100]}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "message": f"获取失败: {e}"}
 
 
 def test_connection(base_url: str, api_key: str, model: str | None, provider_id: str = "custom") -> dict:

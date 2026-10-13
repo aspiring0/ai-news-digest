@@ -150,27 +150,28 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     }
 
 
-def get_hot(limit: int = 20, max_per_source: int = 4) -> list[dict]:
-    """热榜：全部条目按衰减热度倒序，每源最多 max_per_source 条（多样性配额），取 top N。
+def get_hot(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple[list[dict], int]:
+    """热榜：全部条目按衰减热度倒序，每源最多 max_per_source 条（多样性配额），分页返回。
 
     配额只影响榜单展示：高分源（HuggingFace/GitHub 等）最多占 max_per_source 席，
     让新闻源（AIHOT/量子位等）也能进榜；原始分不动，时间线/日报/分类不受影响。
+    返回 (本页条目, 配额后总条数)。
     """
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM news_items").fetchall()
     items = [_row_to_dict(r) for r in rows]
     items.sort(key=lambda x: x["hot_score"], reverse=True)
-    out: list[dict] = []
+    ranked: list[dict] = []
     per_source: dict[str, int] = {}
     for it in items:
         src = it["source_name"]
         if per_source.get(src, 0) >= max_per_source:
             continue
         per_source[src] = per_source.get(src, 0) + 1
-        out.append(it)
-        if len(out) >= limit:
-            break
-    return out
+        ranked.append(it)
+    total = len(ranked)
+    start = (max(1, page) - 1) * per_page
+    return ranked[start:start + per_page], total
 
 
 def get_timeline(page: int = 1, per_page: int = 20) -> tuple[list[dict], int]:
