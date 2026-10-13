@@ -1,9 +1,10 @@
-"""抓取编排：一轮抓取 = 各源 fetch → 打分 → 入库 → 14 天清理。
+"""抓取编排：一轮抓取 = 各源 fetch → 打分 → 入库 → 14 天清理 → 记录源健康。
 
 单个源失败只记日志，不影响其他源。
 """
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -15,7 +16,7 @@ logger = logging.getLogger("ai-news-oss")
 
 
 def run_once() -> dict:
-    """执行一轮完整抓取，返回各源结果统计。"""
+    """执行一轮完整抓取，返回各源结果统计（并写入 source_health 供 UI 健康面板）。"""
     db.init_db()
     now = datetime.now(timezone.utc)
     summary: dict[str, dict] = {}
@@ -36,17 +37,22 @@ def run_once() -> dict:
                         "published_at": item.published_at,  # 缺失则查询时用 fetched_at
                         "fetched_at": now,
                         "score": static_score(score_class, pos, upstream),
+                        "summary": getattr(item, "summary", None),
                     }
                 )
-            summary[name] = {"fetched": len(items), "ok": True}
+            summary[name] = {"ok": True, "fetched": len(items), "at": now.isoformat()}
             logger.info("[%s] 抓到 %d 条", name, len(items))
         except Exception as e:  # noqa: BLE001 - 单个源失败不中断整轮
-            summary[name] = {"fetched": 0, "ok": False, "error": str(e)}
+            summary[name] = {"ok": False, "fetched": 0, "error": str(e), "at": now.isoformat()}
             logger.warning("[%s] 抓取失败: %s", name, e)
 
     added, skipped = db.insert_items(rows)
     deleted = db.cleanup()
     db.set_meta("last_fetch_run", now.isoformat())  # v0.3：健康检查用
+    db.set_meta(
+        "source_health",
+        json.dumps({k: v for k, v in summary.items() if not k.startswith("_")}, ensure_ascii=False),
+    )
     summary["_total"] = {"added": added, "skipped": skipped, "cleaned": deleted}
     logger.info("入库：新增 %d，跳过 %d，清理 14 天前 %d", added, skipped, deleted)
     return summary

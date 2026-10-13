@@ -35,6 +35,10 @@ def init_db() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_published ON news_items(published_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_fetched ON news_items(fetched_at)")
+        # v0.3.6：RSS 摘要兜底（存量库补列）
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(news_items)")}
+        if "summary" not in cols:
+            conn.execute("ALTER TABLE news_items ADD COLUMN summary TEXT")
         # v0.3：键值 meta 表（健康检查记录上次抓取时间等）
         conn.execute(
             """
@@ -101,14 +105,14 @@ def _parse(s: str | None) -> datetime | None:
 
 
 def insert_items(rows: list[dict]) -> tuple[int, int]:
-    """批量入库；按 URL 去重（已存在则跳过）。返回 (新增数, 跳过数)。"""
+    """批量入库；按 URL 去重（已存在则跳过，但会回填缺失的 RSS 摘要）。返回 (新增数, 跳过数)。"""
     added, skipped = 0, 0
     with _connect() as conn:
         for r in rows:
             try:
                 cur = conn.execute(
-                    "INSERT OR IGNORE INTO news_items (url, title, source_name, published_at, fetched_at, score)"
-                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO news_items (url, title, source_name, published_at, fetched_at, score, summary)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (
                         r["url"],
                         r["title"],
@@ -116,12 +120,19 @@ def insert_items(rows: list[dict]) -> tuple[int, int]:
                         _iso(r.get("published_at")),
                         _iso(r.get("fetched_at")),
                         r["score"],
+                        r.get("summary"),
                     ),
                 )
                 if cur.rowcount:
                     added += 1
                 else:
                     skipped += 1
+                    # 回填：旧数据没存 RSS 摘要，重抓到同 URL 时补上（摘要兜底用）
+                    if r.get("summary"):
+                        conn.execute(
+                            "UPDATE news_items SET summary = ? WHERE url = ? AND (summary IS NULL OR summary = '')",
+                            (r["summary"], r["url"]),
+                        )
             except Exception:
                 skipped += 1
     return added, skipped
@@ -146,6 +157,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "published_at": published,
         "fetched_at": fetched,
         "score": score,
+        "summary": row["summary"] if "summary" in row.keys() else None,
         "hot_score": round(hot_score(score, published, fetched), 2),
     }
 

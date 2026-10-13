@@ -1,5 +1,24 @@
 # 更新日志
 
+## v0.3.6（2026-10-13）
+
+使用体验组合：RSS 摘要兜底 / 已读未读 / 源健康 / 日报导出
+
+- 修复摘要正文兜底缺失（真缺陷）：NewsItem 新增 summary 字段（RSS
+  description 去标签/实体截 600 字）；news_items 加 summary 列（存量库
+  自动 ALTER 补列，重抓同 URL 时回填）；/api/summary 把库内 RSS 摘要
+  传入 summarizer——付费墙/反爬文章正文抓取失败时改用 RSS 摘要生成，
+  不再直接 502
+- 已读/未读（纯前端 localStorage）：未读条目标题前蓝点；点标题或
+  「点开汇总」即记已读；热榜/时间线新增「只看未读」开关（与来源筛选
+  可叠加）；回访时顶部「自上次到访新增 N 条」横幅
+- 源健康：每轮抓取把各源 ok/fetched/error/at 写入 meta；新增
+  GET /api/sources/health；utility bar 显示「源 19/19」，点击展开
+  逐源状态面板（失败原因可见）
+- 日报一键导出：/daily 「复制为 Markdown」（标题/链接/来源分组），
+  clipboard API + execCommand 双兜底
+- 测试 +5（RSS 摘要提取/入库回填/api 传参/源健康记录与健康接口）
+
 ## v0.3.5（2026-10-13）
 
 故事合并：热榜按事件聚合，同一新闻多源刷屏归为一席

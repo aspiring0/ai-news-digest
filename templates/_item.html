@@ -1,5 +1,5 @@
 {% set ts = it.published_at or it.fetched_at or it.bookmarked_at %}
-<div class="item" data-source="{{ it.source_name }}" data-title="{{ it.title }}"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}{% if it.hot_score is defined %} data-hot="{{ '%.2f'|format(it.hot_score) }}"{% endif %}>
+<div class="item" data-source="{{ it.source_name }}" data-url="{{ it.url }}" data-title="{{ it.title }}"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}{% if it.hot_score is defined %} data-hot="{{ '%.2f'|format(it.hot_score) }}"{% endif %}>
   <div class="row-main">
     {% if rank is defined %}<span class="rank {{ 'r%d'|format(rank) if rank <= 3 else 'dim' }}" title="第 {{ rank }} 名">{{ '%02d'|format(rank) }}</span>{% endif %}
     {% if it.hot_score is defined %}<span class="score" title="{{ '故事热度（多源加成后）' if it._story is defined and it._story.count > 1 else '衰减热度分' }}">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}

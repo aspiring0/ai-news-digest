@@ -112,7 +112,7 @@ docker compose up -d --build
 
 点击热榜/时间线/日报/主题/收藏里任意新闻标题，弹出摘要窗口：
 
-1. **抓正文**：trafilatura → readability 依次尝试提取网页正文，都失败则用 RSS 摘要兜底；正文截断约 6000 字符。
+1. **抓正文**：trafilatura → readability 依次尝试提取网页正文，都失败则用 **RSS 摘要兜底**（v0.3.6：RSS description 入库，付费墙/反爬文章也能出摘要）；正文截断约 6000 字符。
 2. **调模型**：用你在设置页配置的默认解读引擎，走 OpenAI-compatible 的 `/chat/completions` 接口。
 3. **四段式中文输出**：①一句话核心 ②说人话（这是什么、跟我有啥关系、要不要管）③关键细节 ④原文链接。
 

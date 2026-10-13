@@ -160,6 +160,39 @@
   .story-members li{ margin:2px 0; overflow-wrap:anywhere; }
   @media (max-width:640px){ .story-members{ margin-left:0; } }
 
+  /* ---- 已读/未读 + 新内容横幅 ---- */
+  .item.unread a.title::before{
+    content:""; display:inline-block; width:7px; height:7px; border-radius:50%;
+    background:var(--blue); margin-right:7px; vertical-align:2px;
+  }
+  .unread-toggle{ display:inline-flex; align-items:center; gap:5px; font-size:12px;
+                  color:var(--muted); cursor:pointer; user-select:none; }
+  .unread-toggle input{ accent-color: var(--blue); }
+  .new-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid var(--blue); border-radius:8px; background:var(--blue-bg);
+    color:var(--blue-dark); font-size:12.5px; padding:8px 12px; margin:0 0 12px;
+  }
+  .new-banner button{ border:none; background:none; color:inherit; cursor:pointer; font-size:12px; }
+
+  /* ---- 源健康指示器 + 面板 ---- */
+  .u-health{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:12px;
+             padding:3px 6px; font-family:inherit; }
+  .u-health:hover{ color:var(--blue-dark); }
+  .u-health.bad{ color:var(--amber-text); }
+  .health-panel{
+    position:fixed; top:96px; right:16px; width:min(360px, calc(100vw - 24px));
+    background:var(--card); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 12px 32px rgba(0,0,0,.14); z-index:55; padding:12px 14px;
+    max-height:60vh; overflow-y:auto; font-size:12.5px;
+  }
+  .health-panel h4{ margin:0 0 8px; font-size:12px; letter-spacing:.08em; color:var(--muted); }
+  .health-row{ display:flex; justify-content:space-between; gap:8px; padding:4px 0;
+               border-bottom:1px dashed var(--border); }
+  .health-row:last-child{ border-bottom:none; }
+  .health-row .ok{ color:#15803d; } .health-row .fail{ color:var(--amber-text); }
+  .health-row small{ color:var(--muted); font-size:11px; }
+
   /* ---- 日期分组头 ---- */
   .date-head{ margin:20px 0 6px; font-size:12.5px; font-weight:700; color:var(--muted);
               display:flex; align-items:center; gap:8px; letter-spacing:.08em; }
@@ -209,6 +242,7 @@
     <span class="u-update"><span class="pulse"></span><span id="u-updated">读取更新时间…</span></span>
     <span class="u-right">
       <button class="u-engine" id="u-engine" title="模型平台设置">模型状态…</button>
+      <button class="u-health" id="u-health" title="各源最近一轮抓取状态">源 —</button>
       <button class="u-refresh" id="u-refresh" title="手动抓取一轮并刷新">↻ 刷新</button>
     </span>
   </div>
@@ -355,6 +389,102 @@ var getEngineInfo = (function () {
     try { localStorage.setItem("theme", next); } catch (e) {}
     icon();
   });
+})();
+
+/* ---------- 已读/未读 + 新内容横幅（localStorage，纯前端） ---------- */
+var READ_KEY = "readUrls";
+function _readSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]")); } catch (e) { return new Set(); }
+}
+function markRead(url) {
+  if (!url) return;
+  var s = _readSet();
+  s.add(url);
+  var arr = Array.from(s);
+  try { localStorage.setItem(READ_KEY, JSON.stringify(arr.slice(-2000))); } catch (e) {}
+  var el = document.querySelector('.item[data-url="' + url + '"]');
+  if (el) el.classList.remove("unread");
+}
+(function () {
+  var read = _readSet();
+  document.querySelectorAll(".item[data-url]").forEach(function (el) {
+    if (!read.has(el.getAttribute("data-url"))) el.classList.add("unread");
+  });
+  /* 点标题（跳原文）或点开汇总 → 记为已读 */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("a.title, .sum-btn");
+    if (!t) return;
+    var item = t.closest(".item[data-url]");
+    if (item) markRead(item.getAttribute("data-url"));
+  });
+  /* 「只看未读」开关 */
+  var toggle = document.getElementById("only-unread");
+  if (toggle) {
+    toggle.addEventListener("change", function () {
+      var onlyUnread = toggle.checked;
+      var items = Array.from(document.querySelectorAll(".item[data-url]"));
+      items.forEach(function (it) {
+        if (onlyUnread && !it.classList.contains("unread")) { it.style.display = "none"; return; }
+        if (!onlyUnread) { it.style.display = ""; }
+      });
+      if (!onlyUnread) {
+        /* 恢复后重新应用当前激活的来源筛选 */
+        var active = document.querySelector("#src-chips .chip.active");
+        if (active && active.dataset.src) {
+          var src = active.dataset.src;
+          items.forEach(function (it) { if (it.dataset.source !== src) it.style.display = "none"; });
+        }
+      }
+    });
+  }
+  /* 自上次到访新增 N 条横幅 */
+  try {
+    var LV = "lastVisitTs";
+    var prev = parseInt(localStorage.getItem(LV) || "0", 10);
+    localStorage.setItem(LV, String(Date.now()));
+    if (prev) {
+      var fresh = Array.from(document.querySelectorAll(".item[data-ts]")).filter(function (el) {
+        return new Date(el.getAttribute("data-ts")).getTime() > prev;
+      });
+      if (fresh.length > 0) {
+        var wrap = document.querySelector(".wrap");
+        var banner = document.createElement("div");
+        banner.className = "new-banner";
+        banner.innerHTML = '<span>自上次到访新增 ' + fresh.length + ' 条内容</span><button>知道了</button>';
+        banner.querySelector("button").addEventListener("click", function () { banner.remove(); });
+        wrap.insertBefore(banner, wrap.firstChild);
+      }
+    }
+  } catch (e) {}
+})();
+
+/* ---------- 源健康：指示器 + 面板 ---------- */
+(function () {
+  var btn = document.getElementById("u-health");
+  if (!btn) return;
+  var panel = null;
+  fetch("/api/sources/health").then(function (r) { return r.json(); }).then(function (d) {
+    var srcs = d.sources || {};
+    var names = Object.keys(srcs);
+    if (!names.length) { btn.textContent = "源 —"; return; }
+    var okN = names.filter(function (n) { return srcs[n].ok; }).length;
+    btn.textContent = "源 " + okN + "/" + names.length;
+    if (okN < names.length) btn.classList.add("bad");
+    btn.addEventListener("click", function () {
+      if (panel) { panel.remove(); panel = null; return; }
+      panel = document.createElement("div");
+      panel.className = "health-panel";
+      var rows = names.map(function (n) {
+        var s = srcs[n];
+        var state = s.ok
+          ? '<span class="ok">✓ ' + s.fetched + " 条</span>"
+          : '<span class="fail">✗ ' + String(s.error || "失败").slice(0, 60) + "</span>";
+        return '<div class="health-row"><span>' + n + "</span>" + state + "</div>";
+      });
+      panel.innerHTML = "<h4>各源最近一轮抓取</h4>" + rows.join("");
+      document.body.appendChild(panel);
+    });
+  }).catch(function () { btn.textContent = "源 ?"; });
 })();
 </script>
 </body>

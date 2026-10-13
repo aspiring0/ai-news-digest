@@ -3,7 +3,37 @@
 {% block nav_active %}daily{% endblock %}
 {% block content %}
 <h1>📰 日报 · {{ date_str }}</h1>
-<p class="hint">今日按热度取 top 20，按主题分组。</p>
+<p class="hint" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <span>今日按热度取 top 20，按主题分组。</span>
+  <button class="lead-why" id="export-md" style="border:1px dashed var(--blue)">复制为 Markdown ↗</button>
+</p>
+<script>
+function exportDailyMd() {
+  var lines = ["# AI 资讯日报 · " + document.querySelector("h1").textContent.replace(/^.*日报 · /, "").trim(), ""];
+  document.querySelectorAll("h2.cat, .item").forEach(function (el) {
+    if (el.tagName === "H2") { lines.push("", "## " + el.textContent.trim(), ""); return; }
+    var a = el.querySelector("a.title");
+    var src = el.getAttribute("data-source") || "";
+    if (a) lines.push("- [" + a.textContent.trim() + "](" + a.href + ") · " + src);
+  });
+  return lines.join("\n");
+}
+document.addEventListener("DOMContentLoaded", function () {
+  var btn = document.getElementById("export-md");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var md = exportDailyMd();
+    (navigator.clipboard ? navigator.clipboard.writeText(md) : Promise.reject())
+      .then(function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = "复制为 Markdown ↗"; }, 1600); })
+      .catch(function () {
+        var ta = document.createElement("textarea");
+        ta.value = md; document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); ta.remove();
+        btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = "复制为 Markdown ↗"; }, 1600);
+      });
+  });
+});
+</script>
 {% if items %}
   {% for cat, cat_items in grouped.items() %}
     {% if cat_items %}

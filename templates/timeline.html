@@ -6,6 +6,7 @@
 <p class="hint">按发布时间倒序，共 {{ total }} 条。点击标题或「摘要」查看 AI 解读。</p>
 {% if items %}
   {% include "_chips.html" %}
+  <p style="margin:-6px 0 12px"><label class="unread-toggle"><input type="checkbox" id="only-unread"> 只看未读</label></p>
   <div id="timeline-list">
   {% for it in items %}{% include "_item.html" %}{% endfor %}
   </div>

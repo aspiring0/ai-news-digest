@@ -155,17 +155,28 @@ def api_summary(request: Request, url: str, regenerate: int = 0):
     """摘要：先查缓存；没有则走"抓正文→调模型→缓存"全链路。regenerate=1 强制重新生成。"""
     if regenerate:
         db.delete_summary(url)
-    # 找标题（弹窗展示用）
+    # 找标题与 RSS 摘要（正文抓取失败时兜底，v0.3.6）
     with db._connect() as conn:
-        row = conn.execute("SELECT title FROM news_items WHERE url = ?", (url,)).fetchone()
+        row = conn.execute("SELECT title, summary FROM news_items WHERE url = ?", (url,)).fetchone()
     title = row["title"] if row else ""
-    result = summarizer.summarize(url, title=title, regenerate=bool(regenerate))
+    rss_summary = (row["summary"] if row else None) or ""
+    result = summarizer.summarize(url, title=title, rss_summary=rss_summary, regenerate=bool(regenerate))
     if not result:
         return JSONResponse(
             {"ok": False, "message": "摘要暂不可用（正文抓取失败或未配置模型）"},
             status_code=502,
         )
     return {"ok": True, "summary": result}
+
+
+@app.get("/api/sources/health")
+def api_sources_health():
+    """各源最近一轮抓取健康状态（供 utility bar 指示与面板）。"""
+    import json as _json
+
+    raw = db.get_meta("source_health")
+    sources = _json.loads(raw) if raw else {}
+    return {"ok": True, "sources": sources}
 
 
 # ---------------- 设置页：provider 管理 ----------------
