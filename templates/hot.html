@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日热榜 · AI 资讯聚合</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 16px; background: #f7f7f8; color: #222; }
+  nav { margin-bottom: 12px; }
+  nav a { margin-right: 16px; text-decoration: none; color: #1a73e8; font-weight: 600; }
+  nav a.active { color: #111; }
+  h1 { font-size: 22px; }
+  .hint { color: #666; font-size: 13px; margin-bottom: 16px; }
+  .item { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .item a.title { font-size: 16px; font-weight: 600; color: #111; text-decoration: none; cursor: pointer; }
+  .item a.title:hover { color: #1a73e8; }
+  .meta { margin-top: 6px; font-size: 12px; color: #888; }
+  .score { display: inline-block; background: #fef3e2; color: #b45309; border-radius: 4px; padding: 1px 8px; font-weight: 700; margin-right: 8px; }
+  .stats { font-size: 12px; color: #999; margin-top: 20px; }
+  .empty { color: #999; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+{% set active = "hot" %}{% include "_nav.html" %}
+<h1>🔥 今日热榜</h1>
+<p class="hint">按时间衰减热度排序（hot_score = 原始分 × 0.5^(小时/48)）。点击标题弹出 AI 摘要。共 {{ stats.total }} 条在库。</p>
+{% if items %}
+  {% for it in items %}{% include "_item.html" %}{% endfor %}
+{% else %}
+  <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>
+{% endif %}
+<div class="stats">数据每 4 小时自动刷新 · 只保留 14 天</div>
+{% include "_summary_modal.html" %}
+</body>
+</html>
