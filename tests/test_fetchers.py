@@ -8,7 +8,7 @@ from app.fetchers.base import NewsItem
 
 def test_all_fetchers_registered_with_metadata():
     """每个注册的 fetcher 必须带 SOURCE_NAME / SCORE_CLASS / 可调 fetch()，且显示名唯一。"""
-    assert len(FETCHERS) >= 16, f"应有至少 16 个源（10 旧 + 6 新），实际 {len(FETCHERS)}"
+    assert len(FETCHERS) >= 19, f"应有至少 19 个源（10 基础 + 6 + 3），实际 {len(FETCHERS)}"
     names = []
     for mod in FETCHERS:
         assert getattr(mod, "SOURCE_NAME", None), f"{mod.__name__} 缺 SOURCE_NAME"
@@ -18,10 +18,16 @@ def test_all_fetchers_registered_with_metadata():
     assert len(names) == len(set(names)), f"SOURCE_NAME 重复: {sorted(names)}"
 
 
-def test_new_sources_present():
+def test_direct_upstream_sources_present():
+    """v0.3.3/v0.3.4 两批拆出来的直接源必须全部注册。"""
     names = {m.SOURCE_NAME for m in FETCHERS}
-    for expect in ("Ars Technica AI", "Hacker News AI", "OpenAI", "Google DeepMind", "IT之家", "VentureBeat AI"):
-        assert expect in names, f"新源 {expect} 未注册"
+    for expect in (
+        # v0.3.3
+        "Ars Technica AI", "Hacker News AI", "OpenAI", "Google DeepMind", "IT之家", "VentureBeat AI",
+        # v0.3.4
+        "Tessl", "GitHub Releases", "MarkTechPost",
+    ):
+        assert expect in names, f"直接源 {expect} 未注册"
 
 
 def test_ithome_filters_ai_keywords(monkeypatch):

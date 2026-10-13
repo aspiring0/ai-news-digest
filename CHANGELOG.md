@@ -1,5 +1,19 @@
 # 更新日志
 
+## v0.3.4（2026-10-13）
+
+源池二批：再拆 3 个稳定上游为直接源（全部免 key），源总数 16 → 19
+
+- 新增 fetcher：MarkTechPost / Tessl / GitHub Releases（GitHub 官方
+  Atom，跟踪 openai/codex 与 anthropics/claude-code 版本发布，无需 key）
+- 探测成功但稳定性不足未收录：Sierra / ARC Prize / Comfy Blog
+  （探测一轮后对全部 UA 返回 404，疑似激进 IP 限流）
+- 无公开 RSS 跳过：Vapi、Meshy、Artificial Analysis、Amazon Science、
+  Anthropic、xAI、LangChain、Redwood、Epoch AI、Prime Intellect——
+  这些内容继续经 AIHOT 兜底；按约定跳过需平台 API 的：X/Twitter
+  个人号、微信公众号、YouTube、播客
+- 测试：注册完整性门槛提升至 19 + 两批直接源名单断言
+
 ## v0.3.3（2026-10-13）
 
 源池扩充：直接订阅 6 个原经 AIHOT 中转的上游源（先探 RSS 可用性再收录）

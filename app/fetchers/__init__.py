@@ -3,24 +3,29 @@ from . import (
     aihot,
     ars_technica,
     deepmind,
+    github_releases,
     github_trending,
     hn_ai,
     huggingface,
     ithome,
+    marktechpost,
     openai_news,
     producthunt,
     qbitai,
     rundown,
     superhuman,
     techcrunch,
+    tessl,
     thebatch,
     tldr,
     venturebeat,
 )
 
 # 每个元素是一个 fetcher 模块（须提供 fetch() / SOURCE_NAME / SCORE_CLASS）
-# v0.3.3 新增 6 个直接源（原 AIHOT 的上游）：Ars Technica AI / Hacker News AI /
-# OpenAI / Google DeepMind / IT之家 / VentureBeat AI
+# v0.3.3 新增 6 个直接源：Ars Technica AI / Hacker News AI / OpenAI /
+# Google DeepMind / IT之家 / VentureBeat AI
+# v0.3.4 再拆 3 个稳定上游：Tessl / GitHub Releases / MarkTechPost
+# （Sierra/ARC Prize/Comfy 探测成功后即被源站限流 404，稳定性不足未收录）
 FETCHERS = [
     aihot,
     tldr,
@@ -38,6 +43,9 @@ FETCHERS = [
     deepmind,
     ithome,
     venturebeat,
+    tessl,
+    github_releases,
+    marktechpost,
 ]
 
 __all__ = ["FETCHERS"]

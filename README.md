@@ -1,6 +1,6 @@
 # AI 资讯聚合（开源版 · v0.3）
 
-一个自托管的 AI 资讯聚合站：定时抓取 16 个 AI 信息源，按"时间衰减热度"排出今日热榜，另有时间线、日报、主题视图；点击新闻弹出 AI 摘要（用你自己的模型 key）；支持收藏。单文件 SQLite，数据全在自己机器上。
+一个自托管的 AI 资讯聚合站：定时抓取 19 个 AI 信息源，按"时间衰减热度"排出今日热榜，另有时间线、日报、主题视图；点击新闻弹出 AI 摘要（用你自己的模型 key）；支持收藏。单文件 SQLite，数据全在自己机器上。
 
 > 精简版：只做聚合 + 热榜 + 时间线 + 日报 + 主题 + 摘要 + 收藏 + 模型设置。不含任何 IG/选题工作流。
 
@@ -63,6 +63,17 @@ docker compose up -d --build
 | IT之家 | 全站 RSS + AI 关键词过滤（AI 分类 feed 已 404） | ✅ |
 | VentureBeat AI | 官方分类 RSS | ✅ |
 | The Decoder | RSS 被反爬挡（返回 HTML） | ⏭️ 未收录，其内容经 AIHOT 兜底 |
+
+### v0.3.4 新增：再拆 3 个稳定上游（全部免 key）
+
+| 来源 | 抓取方式 | 状态 |
+|---|---|---|
+| MarkTechPost | 官方 RSS | ✅ 2026-10-13 实测可用 |
+| Tessl（产品与工程博客） | 官方 RSS | ✅ |
+| GitHub Releases | GitHub 官方 Atom（openai/codex、anthropics/claude-code，无需 key） | ✅ |
+| Sierra / ARC Prize / Comfy Blog | 探测成功一轮后即被源站限流（404/全 UA） | ⏭️ 稳定性不足未收录，如需可自行加回 `app/fetchers/` |
+| Vapi / Meshy / Artificial Analysis / Amazon Science / Anthropic / xAI / LangChain / Redwood / Epoch / Prime Intellect | 无公开 RSS | ⏭️ 跳过，经 AIHOT 兜底 |
+| X/Twitter 个人号、微信公众号、YouTube、播客 | 平台无 RSS（需平台 API key） | ⏭️ 按约定跳过 |
 
 单个源失败只记日志，不影响其他源。
 
