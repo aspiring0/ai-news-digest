@@ -2,88 +2,152 @@
 {% block title %}设置 · AI 资讯聚合{% endblock %}
 {% block nav_active %}settings{% endblock %}
 {% block content %}
+<script>
+/* 被抽屉 iframe 加载时：隐藏自身顶栏，适配窄宽度 */
+if (window.self !== window.top) { document.documentElement.classList.add("in-drawer"); }
+</script>
 <style>
-  h2.sec-title { font-size: 16px; margin: 28px 0 10px; }
+  html.in-drawer header.site, html.in-drawer .utility-bar, html.in-drawer .drawer-mask,
+  html.in-drawer .drawer, html.in-drawer footer { display: none !important; }
+  html.in-drawer body { background: var(--bg); }
+  html.in-drawer .wrap { padding: 10px; }
+
+  h1 { font-size: 18px; }
+  h2.sec-title { font-size: 14px; margin: 20px 0 8px; color: var(--muted); }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-          padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+          padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
   .card.saved { border-left: 4px solid #16a34a; }
-  .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-  .card-head b { font-size: 15px; }
+  .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .card-head b { font-size: 14px; }
   .badge { font-size: 11px; background: #dcfce7; color: #166534; border-radius: 4px; padding: 2px 8px; }
   .masked { font-size: 12px; color: var(--muted); }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
   label { font-size: 13px; color: var(--muted); width: 70px; flex-shrink: 0; }
-  input[type=text], input[type=password] { flex: 1; min-width: 200px; padding: 7px 10px;
-          border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
-  .btn { border: 1px solid var(--border); background: #f9fafb; border-radius: 6px;
+  input[type=text], input[type=password], select { flex: 1; min-width: 180px; padding: 7px 10px;
+          border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card); color: var(--text); }
+  .btn { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px;
          padding: 6px 14px; cursor: pointer; font-size: 13px; }
   .btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
   .btn.danger { color: #b91c1c; }
-  .btn:hover { background: #eef1f4; }
-  .btn.primary:hover { background: var(--blue-dark); }
-  .warn { font-size: 12px; color: #b45309; background: var(--amber-bg); border-radius: 6px;
-          padding: 8px 12px; margin: 12px 0; }
+  .btn:hover { filter: brightness(.96); }
+  .warn { font-size: 12px; color: var(--amber-text); background: var(--amber-bg); border-radius: 6px;
+          padding: 8px 12px; margin: 10px 0; }
   .msg { font-size: 13px; margin-top: 6px; min-height: 18px; }
   .msg.ok { color: #166534; }
   .msg.err { color: #b91c1c; }
   .host-hint { font-size: 12px; color: var(--muted); }
+  details.panel { border: 1px solid var(--border); border-radius: 10px; background: var(--card);
+                  margin-bottom: 12px; }
+  details.panel > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14px;
+                            list-style: none; }
+  details.panel > summary::before { content: "▸ "; color: var(--muted); }
+  details.panel[open] > summary::before { content: "▾ "; }
+  details.panel .panel-body { padding: 0 12px 12px; }
 </style>
-<h1>⚙️ 模型设置</h1>
+<h1>模型平台</h1>
 <p class="hint">摘要功能调用你自己的模型 key。key 只存在本机 SQLite，<b>不要</b>把数据库文件发给别人。</p>
-<div class="warn">安全提示：内置 provider 的接口地址只能是官方域名；修改已保存的接口地址时必须重新输入 key。自定义 provider 可填任意 OpenAI-compatible 地址。</div>
+<div class="warn">安全提示：内置 provider 的接口地址只能是官方域名；修改已保存的接口地址时必须重新输入 key。</div>
 
-<h2 class="sec-title">已保存的 provider</h2>
-<div id="saved-list">
-{% for p in providers %}
-  <div class="card saved" data-pid="{{ p.id }}">
-    <div class="card-head"><b>{{ p.name }}</b>{% if p.is_default %}<span class="badge">默认解读引擎</span>{% endif %}<span class="masked">key: {{ p.api_key_masked }}</span></div>
-    <div class="row"><label>key</label><input type="password" class="f-key" placeholder="修改地址时必须重新输入 key"></div>
-    <div class="row"><label>接口地址</label><input type="text" class="f-base" value="{{ p.base_url }}" data-orig="{{ p.base_url }}"></div>
-    <div class="row"><label>模型名</label><input type="text" class="f-model" value="{{ p.model or '' }}" placeholder="如 deepseek-chat"></div>
-    <div class="row">
-      <button class="btn" onclick='testProvider({{ p.id|tojson }})'>测试连接</button>
-      <button class="btn primary" onclick='saveProvider({{ p.id|tojson }}, {{ 'true' if p.builtin else 'false' }}, {{ p.name|tojson }})'>保存</button>
-      {% if not p.is_default %}<button class="btn" onclick='setDefault({{ p.id|tojson }})'>设为默认</button>{% endif %}
-      <button class="btn danger" onclick='delProvider({{ p.id|tojson }})'>删除</button>
-    </div>
-    <div class="msg" id="msg-{{ p.id }}"></div>
-  </div>
-{% else %}
-  <p class="hint">还没有保存任何 provider，先在下面配置。</p>
-{% endfor %}
-</div>
+<datalist id="dl-models">
+  <option value="deepseek-chat">DeepSeek</option>
+  <option value="deepseek-reasoner">DeepSeek</option>
+  <option value="glm-4-flash">智谱</option>
+  <option value="glm-4-plus">智谱</option>
+  <option value="qwen-flash">通义</option>
+  <option value="kimi-k2">Kimi</option>
+  <option value="gpt-4o-mini">OpenAI</option>
+  <option value="gemini-2.0-flash">Gemini</option>
+</datalist>
 
-<h2 class="sec-title">配置内置 provider</h2>
-{% for pid, meta in builtin.items() %}
-<div class="card" data-pid="{{ pid }}">
-  <div class="card-head"><b>{{ meta.name }}</b><span class="host-hint">官方域名：{{ meta.hosts|join(', ') }}</span></div>
-  <div class="row"><label>key</label><input type="password" class="f-key" placeholder="必填"></div>
-  <div class="row"><label>接口地址</label><input type="text" class="f-base" value="https://{{ meta.hosts[0] }}"></div>
-  <div class="row"><label>模型名</label><input type="text" class="f-model" value="{{ meta.default_model }}"></div>
+<h2 class="sec-title">默认解读引擎</h2>
+<div class="card" id="default-engine-card">
+  {% if providers %}
   <div class="row">
-    <button class="btn" onclick='testProvider({{ pid|tojson }})'>测试连接</button>
-    <button class="btn primary" onclick='saveProvider({{ pid|tojson }}, true, {{ meta.name|tojson }})'>保存</button>
+    <label>provider</label>
+    <select id="default-provider">
+      {% for p in providers %}
+      <option value="{{ p.id }}" {{ 'selected' if p.is_default else '' }}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
   </div>
-  <div class="msg" id="msg-{{ pid }}"></div>
+  <div class="row">
+    <button class="btn primary" onclick="setDefaultFromSelect()">设为默认</button>
+    <span class="host-hint">各 provider 的模型名在「已启用」卡片里配置（输入框支持常用模型联想）</span>
+  </div>
+  <div class="msg" id="msg-default"></div>
+  {% else %}
+  <p class="host-hint">还没有保存任何 provider，先在下方「其他平台」或「自定义」里配置一家。</p>
+  {% endif %}
 </div>
-{% endfor %}
 
-<h2 class="sec-title">自定义 provider（任意 OpenAI-compatible 地址）</h2>
-<div class="card" data-pid="__custom_new__">
-  <div class="row"><label>id</label><input type="text" class="f-cid" placeholder="如 my-proxy（英文字母/数字/横线）"></div>
-  <div class="row"><label>名称</label><input type="text" class="f-cname" placeholder="显示名"></div>
-  <div class="row"><label>key</label><input type="password" class="f-key" placeholder="必填"></div>
-  <div class="row"><label>接口地址</label><input type="text" class="f-base" placeholder="https://你的地址"></div>
-  <div class="row"><label>模型名</label><input type="text" class="f-model" placeholder="模型名"></div>
-  <div class="row"><button class="btn primary" onclick="saveCustom()">保存自定义 provider</button></div>
-  <div class="msg" id="msg-custom"></div>
-</div>
+<details class="panel" open>
+  <summary>已启用（{{ providers | length }}）</summary>
+  <div class="panel-body">
+    {% for p in providers %}
+    <div class="card saved" data-pid="{{ p.id }}">
+      <div class="card-head"><b>{{ p.name }}</b>{% if p.is_default %}<span class="badge">默认解读引擎</span>{% endif %}<span class="masked">key: {{ p.api_key_masked }}</span></div>
+      <div class="row"><label>key</label><input type="password" class="f-key" placeholder="保存时必填（修改地址时必须重新输入）"></div>
+      <div class="row"><label>接口地址</label><input type="text" class="f-base" value="{{ p.base_url }}" data-orig="{{ p.base_url }}"></div>
+      <div class="row"><label>模型名</label><input type="text" class="f-model" list="dl-models" value="{{ p.model or '' }}" placeholder="如 deepseek-chat"></div>
+      <div class="row">
+        <button class="btn primary" onclick='saveProvider({{ p.id|tojson }}, {{ 'true' if p.builtin else 'false' }}, {{ p.name|tojson }})'>保存</button>
+        <button class="btn" onclick='testProvider({{ p.id|tojson }})'>测试连接</button>
+        {% if not p.is_default %}<button class="btn" onclick='setDefault({{ p.id|tojson }})'>设为默认</button>{% endif %}
+        <button class="btn danger" onclick='delProvider({{ p.id|tojson }})'>删除已保存 Key</button>
+      </div>
+      <div class="msg" id="msg-{{ p.id }}"></div>
+    </div>
+    {% else %}
+    <p class="host-hint">暂无已保存 provider。</p>
+    {% endfor %}
+  </div>
+</details>
+
+<details class="panel">
+  <summary>其他平台（{{ builtin | length }}，默认收起）</summary>
+  <div class="panel-body">
+    {% for pid, meta in builtin.items() %}
+    <div class="card" data-pid="{{ pid }}">
+      <div class="card-head"><b>{{ meta.name }}</b><span class="host-hint">官方域名：{{ meta.hosts|join(', ') }}</span></div>
+      <div class="row"><label>key</label><input type="password" class="f-key" placeholder="必填"></div>
+      <div class="row"><label>接口地址</label><input type="text" class="f-base" value="https://{{ meta.hosts[0] }}"></div>
+      <div class="row"><label>模型名</label><input type="text" class="f-model" list="dl-models" value="{{ meta.default_model }}"></div>
+      <div class="row">
+        <button class="btn primary" onclick='saveProvider({{ pid|tojson }}, true, {{ meta.name|tojson }})'>保存</button>
+        <button class="btn" onclick='testProvider({{ pid|tojson }})'>测试连接</button>
+      </div>
+      <div class="msg" id="msg-{{ pid }}"></div>
+    </div>
+    {% endfor %}
+  </div>
+</details>
+
+<details class="panel" open>
+  <summary>自定义 provider（任意 OpenAI-compatible 地址）</summary>
+  <div class="panel-body">
+    <div class="card" data-pid="__custom_new__">
+      <div class="row"><label>id</label><input type="text" class="f-cid" placeholder="如 my-proxy（英文字母/数字/横线）"></div>
+      <div class="row"><label>名称</label><input type="text" class="f-cname" placeholder="显示名"></div>
+      <div class="row"><label>key</label><input type="password" class="f-key" placeholder="必填"></div>
+      <div class="row"><label>接口地址</label><input type="text" class="f-base" placeholder="https://你的地址"></div>
+      <div class="row"><label>模型名</label><input type="text" class="f-model" list="dl-models" placeholder="模型名"></div>
+      <div class="row"><button class="btn primary" onclick="saveCustom()">保存自定义 provider</button></div>
+      <div class="msg" id="msg-custom"></div>
+    </div>
+  </div>
+</details>
 
 <script>
 function cardOf(pid) { return document.querySelector('.card[data-pid="' + pid + '"]'); }
 function msg(pid, text, ok) {
   const el = document.getElementById("msg-" + pid);
-  el.textContent = text; el.className = "msg " + (ok ? "ok" : "err");
+  if (el) { el.textContent = text; el.className = "msg " + (ok ? "ok" : "err"); }
+}
+async function setDefaultFromSelect() {
+  const pid = document.getElementById("default-provider").value;
+  await fetch("/api/providers/" + encodeURIComponent(pid) + "/default", {method: "POST"});
+  msg("default", "已设为默认，刷新中…", true);
+  setTimeout(() => location.reload(), 600);
 }
 async function saveProvider(pid, builtin, name) {
   const card = cardOf(pid);
@@ -136,7 +200,7 @@ async function setDefault(pid) {
   location.reload();
 }
 async function delProvider(pid) {
-  if (!confirm("删除 " + pid + "？")) return;
+  if (!confirm("删除 " + pid + " 的已保存 Key？")) return;
   await fetch("/api/providers/" + encodeURIComponent(pid), {method: "DELETE"});
   location.reload();
 }

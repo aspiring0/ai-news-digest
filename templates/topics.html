@@ -1,16 +1,45 @@
 {% extends "_base.html" %}
-{% block title %}主题 · AI 资讯聚合{% endblock %}
+{% block title %}分类 · AI 资讯聚合{% endblock %}
 {% block nav_active %}topics{% endblock %}
 {% block content %}
-<h1>🏷️ 主题分类</h1>
-<p class="hint">近 3 天条目，按关键词规则分类（规则在 <code>app/classifier.py</code>，改关键词只改那一个文件）。</p>
-{% for cat, cat_items in grouped.items() %}
-  <h2 class="cat">{{ cat }}（{{ cat_items|length }}）</h2>
-  {% if cat_items %}
-    {% for it in cat_items[:15] %}{% include "_item.html" %}{% endfor %}
-    {% if cat_items|length > 15 %}<p class="hint">…还有 {{ cat_items|length - 15 }} 条</p>{% endif %}
-  {% else %}
-    <p class="hint">暂无</p>
-  {% endif %}
-{% endfor %}
+<h1>分类</h1>
+<p class="hint">近 3 天条目，关键词规则分类（前端筛选 + 按热度排序）。</p>
+<div class="chips" id="cat-chips">
+  <button class="chip active" data-cat="">全部<span class="chip-n"></span></button>
+  {% for cat, lst in grouped.items() if lst %}
+  <button class="chip" data-cat="{{ cat }}">{{ cat }}<span class="chip-n"></span></button>
+  {% endfor %}
+</div>
+<div class="slim-list" id="topic-list">
+{% for cat, lst in grouped.items() %}{% for it in lst %}{% include "_item.html" %}{% endfor %}{% endfor %}
+</div>
+<script>
+  /* 分类 pill：等基座脚本插完分类 badge 后，按热度重排 + 计数 + 筛选 */
+  document.addEventListener("ai:classified", function () {
+    var list = document.getElementById("topic-list");
+    if (!list) return;
+    var items = Array.from(list.querySelectorAll(".item"));
+    /* 按衰减热度全局重排（后端给的是分组序） */
+    items.sort(function (a, b) { return parseFloat(b.dataset.hot || 0) - parseFloat(a.dataset.hot || 0); });
+    items.forEach(function (el) { list.appendChild(el); });
+    /* 计数 */
+    var chips = document.getElementById("cat-chips");
+    var count = function (cat) {
+      return cat ? items.filter(function (i) { return i.dataset.cat === cat; }).length : items.length;
+    };
+    chips.querySelectorAll(".chip").forEach(function (c) {
+      c.querySelector(".chip-n").textContent = count(c.dataset.cat);
+    });
+    /* 筛选 */
+    chips.addEventListener("click", function (e) {
+      var btn = e.target.closest(".chip");
+      if (!btn) return;
+      chips.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("active", c === btn); });
+      var cat = btn.dataset.cat;
+      items.forEach(function (it) {
+        it.style.display = (!cat || it.dataset.cat === cat) ? "" : "none";
+      });
+    });
+  });
+</script>
 {% endblock %}

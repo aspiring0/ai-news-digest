@@ -38,7 +38,7 @@
   a{ color:var(--blue); text-decoration:none; }
   a:hover{ color:var(--blue-dark); text-decoration:underline; }
 
-  /* ---- 顶栏：左标题 + 右 tab + 主题切换 ---- */
+  /* ---- 顶栏：左标题 + 5 个纯文本 tab + 设置/主题 ---- */
   header.site{ background:var(--card); border-bottom:1px solid var(--border); }
   .header-inner{
     max-width:900px; margin:0 auto; padding:0 16px; min-height:52px;
@@ -49,14 +49,34 @@
   nav.tabs a{ padding:6px 12px; border-radius:8px; color:var(--muted); font-weight:500; }
   nav.tabs a:hover{ background:var(--bg); color:var(--text); text-decoration:none; }
   nav.tabs a.active{ color:var(--blue); background:var(--blue-bg); font-weight:600; }
-  .theme-toggle{
+  .header-actions{ display:flex; gap:8px; align-items:center; }
+  .icon-btn{
     flex-shrink:0; border:1px solid var(--border); background:var(--card); border-radius:8px;
-    width:34px; height:34px; cursor:pointer; font-size:15px; line-height:1;
-    display:flex; align-items:center; justify-content:center;
+    height:34px; padding:0 10px; cursor:pointer; font-size:13px; line-height:1;
+    display:flex; align-items:center; justify-content:center; color:var(--text); font-family:inherit;
   }
-  .theme-toggle:hover{ background:var(--bg); }
+  .icon-btn:hover{ background:var(--bg); }
 
-  /* ---- 内容区：约 900px 居中 ---- */
+  /* ---- utility bar：更新时间（呼吸点） + 模型状态 + 刷新 ---- */
+  .utility-bar{ background:var(--card); border-bottom:1px solid var(--border); }
+  .utility-inner{
+    max-width:900px; margin:0 auto; padding:5px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  }
+  .u-update{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+  .pulse{ width:8px; height:8px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; flex-shrink:0; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(34,197,94,.45);} 70%{box-shadow:0 0 0 7px rgba(34,197,94,0);} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0);} }
+  .u-right{ display:flex; align-items:center; gap:8px; }
+  .u-engine{
+    border:1px solid var(--border); background:var(--bg); color:var(--text); border-radius:999px;
+    padding:3px 12px; font-size:12px; cursor:pointer; max-width:300px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; font-family:inherit;
+  }
+  .u-engine:hover{ border-color:var(--blue); color:var(--blue-dark); }
+  .u-refresh{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:12px; padding:3px 6px; font-family:inherit; }
+  .u-refresh:hover{ color:var(--blue-dark); }
+
+  /* ---- 内容区 ---- */
   .wrap{ max-width:900px; margin:0 auto; padding:16px; }
   h1{ font-size:22px; margin:8px 0 4px; }
   h2.cat{ font-size:16px; margin:22px 0 10px; border-left:4px solid var(--blue); padding-left:8px; }
@@ -64,7 +84,30 @@
   .empty{ color:var(--muted); padding:40px 0; text-align:center; background:var(--card);
           border:1px dashed var(--border); border-radius:10px; }
 
-  /* ---- 来源筛选 chips ---- */
+  /* ---- lead strip：头条 + 分数盒 ---- */
+  .lead{
+    display:flex; gap:16px; align-items:stretch; margin:0 0 14px;
+    background:linear-gradient(135deg, var(--blue-bg), var(--card) 70%);
+    border:1px solid var(--border); border-radius:12px; padding:14px 16px;
+  }
+  .lead-left{ flex:1; min-width:0; }
+  .lead-brand{ font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--blue); text-transform:uppercase; }
+  .lead-title{
+    display:block; font-size:18px; font-weight:700; color:var(--text);
+    margin:4px 0 6px; overflow-wrap:anywhere; line-height:1.4;
+  }
+  .lead-title:hover{ color:var(--blue-dark); text-decoration:none; }
+  .lead-why{ border:none; background:var(--blue-bg); color:var(--blue-dark); border-radius:6px;
+             padding:4px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
+  .lead-why:hover{ filter:brightness(.97); }
+  .lead-score{
+    flex-shrink:0; min-width:96px; border:1px solid var(--border); border-radius:10px; background:var(--card);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 14px;
+  }
+  .lead-score span{ font-size:11px; color:var(--muted); }
+  .lead-score b{ font-size:24px; color:var(--amber-text); font-variant-numeric:tabular-nums; }
+
+  /* ---- 来源筛选 chips / 分类 pill ---- */
   .chips{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px; }
   .chip{
     border:1px solid var(--border); background:var(--card); color:var(--muted);
@@ -74,35 +117,54 @@
   .chip.active{ background:var(--blue-bg); color:var(--blue-dark); border-color:var(--blue); font-weight:600; }
   .chip-n{ opacity:.65; font-size:11px; margin-left:4px; }
 
-  /* ---- 条目行：排名徽标 + badge + 标题 + 摘要按钮 + 来源·时间 ---- */
+  /* ---- 条目卡：主行（排名+badge+分数+标题）+ 副行（汇总+来源时间） ---- */
   .item{
     background:var(--card); border:1px solid var(--border); border-radius:10px;
-    padding:10px 14px; margin-bottom:10px;
-    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-    box-shadow:var(--shadow);
+    padding:10px 14px; margin-bottom:10px; box-shadow:var(--shadow);
   }
+  .row-main{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .row-sub{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:5px; padding-left:2px; }
   .rank{
-    flex-shrink:0; width:26px; height:26px; border-radius:8px; color:#fff;
-    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;
+    flex-shrink:0; min-width:26px; height:26px; padding:0 4px; border-radius:8px; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;
+    font-variant-numeric:tabular-nums;
   }
   .rank.r1{ background:linear-gradient(135deg,#f59e0b,#d97706); }
   .rank.r2{ background:linear-gradient(135deg,#94a3b8,#64748b); }
   .rank.r3{ background:linear-gradient(135deg,#d9a06c,#b45309); }
+  .rank.dim{ background:var(--bg); color:var(--muted); border:1px solid var(--border); }
+  .cat-badge{
+    flex-shrink:0; font-size:11px; font-weight:600; border-radius:5px; padding:1px 7px; white-space:nowrap;
+  }
+  .cb-model{ background:#dbeafe; color:#1d4ed8; }
+  .cb-app{ background:#dcfce7; color:#15803d; }
+  .cb-policy{ background:#ede9fe; color:#6d28d9; }
+  .cb-finance{ background:#ffedd5; color:#c2410c; }
+  .cb-robot{ background:#cffafe; color:#0e7490; }
+  .cb-other{ background:var(--bg); color:var(--muted); border:1px solid var(--border); }
+  html[data-theme="dark"] .cb-model{ background:#1e3a8a; color:#93c5fd; }
+  html[data-theme="dark"] .cb-app{ background:#14532d; color:#86efac; }
+  html[data-theme="dark"] .cb-policy{ background:#4c1d95; color:#c4b5fd; }
+  html[data-theme="dark"] .cb-finance{ background:#7c2d12; color:#fdba74; }
+  html[data-theme="dark"] .cb-robot{ background:#155e75; color:#67e8f9; }
   .score{
     flex-shrink:0; background:var(--amber-bg); color:var(--amber-text);
     border-radius:6px; padding:1px 8px; font-weight:700; font-size:13px; font-variant-numeric:tabular-nums;
   }
-  .item a.title{ color:var(--blue-dark); font-weight:600; font-size:15px; cursor:pointer;
-                 min-width:0; overflow-wrap:anywhere; }
-  .item a.title:hover{ text-decoration:underline; }
+  .item a.title{ color:var(--text); font-weight:600; font-size:15px; min-width:0; overflow-wrap:anywhere; }
+  .item a.title:hover{ color:var(--blue-dark); text-decoration:underline; }
   .sum-btn{
     flex-shrink:0; border:1px solid var(--blue); background:var(--blue-bg); color:var(--blue-dark);
-    border-radius:6px; padding:2px 10px; font-size:12px; cursor:pointer;
+    border-radius:6px; padding:2px 10px; font-size:12px; cursor:pointer; font-family:inherit;
   }
   .sum-btn:hover{ filter:brightness(.97); }
-  .item .spacer{ flex:1; }
-  .meta{ color:var(--muted); font-size:12px; white-space:nowrap; }
+  .row-main .spacer{ flex:1; }
+  .meta{ color:var(--muted); font-size:12px; }
   .star{ flex-shrink:0; border:none; background:none; cursor:pointer; font-size:16px; padding:0 2px; color:#9ca3af; }
+
+  /* 紧凑列表（主题页） */
+  .slim-list .item{ padding:6px 12px; margin-bottom:6px; }
+  .slim-list .item a.title{ font-size:14px; }
 
   /* ---- 时间线日期分组头 ---- */
   .date-head{ margin:18px 0 8px; font-size:13px; font-weight:600; color:var(--muted);
@@ -116,55 +178,175 @@
 
   .stats-line{ font-size:12px; color:var(--muted); margin-top:20px; }
 
+  /* ---- 设置抽屉 ---- */
+  .drawer-mask{ position:fixed; inset:0; background:rgba(15,23,42,.4); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .drawer{ position:fixed; top:0; right:0; bottom:0; width:min(480px, 100vw); z-index:61;
+           background:var(--bg); border-left:1px solid var(--border); transform:translateX(100%);
+           transition:transform .25s ease; display:flex; flex-direction:column; }
+  body.drawer-open .drawer-mask{ opacity:1; pointer-events:auto; }
+  body.drawer-open .drawer{ transform:translateX(0); }
+  .drawer-head{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px;
+                border-bottom:1px solid var(--border); background:var(--card); }
+  .drawer-head b{ font-size:15px; }
+  .drawer-close{ border:none; background:none; font-size:18px; cursor:pointer; color:var(--muted); }
+  .drawer iframe{ flex:1; width:100%; border:none; background:var(--bg); }
+
   /* ---- 移动端 ---- */
   @media (max-width:640px){
     .header-inner{ padding:6px 12px; }
     nav.tabs a{ padding:5px 8px; font-size:13px; }
     h1{ font-size:19px; }
-    .item{ gap:8px; padding:10px 12px; }
-    .item a.title{ font-size:14px; flex-basis:100%; order:2; }
-    .rank, .score{ order:0; } .star{ order:1; margin-left:auto; }
-    .sum-btn{ order:3; } .meta{ order:4; white-space:normal; }
+    .lead{ flex-direction:column; }
+    .lead-score{ flex-direction:row; gap:10px; justify-content:flex-start; }
+    .row-main{ gap:8px; }
+    .item{ padding:10px 12px; }
+    .item a.title{ font-size:14px; }
+    .u-engine{ max-width:180px; }
   }
 </style>
 </head>
 <body>
 {% set active = self.nav_active() | trim %}
 {% include "_nav.html" %}
+<div class="utility-bar">
+  <div class="utility-inner">
+    <span class="u-update"><span class="pulse"></span><span id="u-updated">读取更新时间…</span></span>
+    <span class="u-right">
+      <button class="u-engine" id="u-engine" title="模型平台设置">模型状态…</button>
+      <button class="u-refresh" id="u-refresh" title="刷新页面数据">↻ 刷新</button>
+    </span>
+  </div>
+</div>
 <main class="wrap">
 {% block content %}{% endblock %}
 </main>
 {% include "_summary_modal.html" %}
+
+<!-- 设置抽屉：iframe 承载 /settings 全部功能（零接口依赖） -->
+<div class="drawer-mask" id="drawer-mask"></div>
+<aside class="drawer" id="settings-drawer" aria-label="模型平台">
+  <div class="drawer-head"><b>模型平台</b><button class="drawer-close" id="drawer-close" aria-label="关闭">✕</button></div>
+  <iframe id="settings-frame" title="模型平台设置"></iframe>
+</aside>
+
 <script>
-/* 来源筛选 chips：纯前端过滤 .item[data-source] */
+/* ---------- 前端分类器：规则与 app/classifier.py 保持同步（改那边记得同步这里） ---------- */
+var CAT_RULES = [
+  ["政策与监管", ["监管","立法","法案","合规","审查","禁令","白宫","行政令","FTC","欧盟","AI Act","regulation","compliance","lawsuit","court ruling","ban","executive order","antitrust"]],
+  ["融资与公司动态", ["融资","估值","IPO","收购","并购","亿美元","轮融资","上市","raises","funding","valuation","acquisition","acquires","billion","million round"]],
+  ["具身智能与机器人", ["机器人","人形","具身","机械臂","四足","无人机","自动驾驶","robot","humanoid","embodied","drone","self-driving","autonomous vehicle"]],
+  ["AI 大模型", ["大模型","LLM","GPT","Claude","Gemini","Llama","Qwen","DeepSeek","Kimi","GLM","文心","混元","foundation model","frontier model","推理模型","多模态","开源模型","open weights","benchmark"]],
+  ["AI 应用", ["应用","App","Copilot","助手","智能体","Agent","搜索","办公","编程","代码","绘画","视频生成","音乐","教育","医疗","agent","copilot","assistant","coding","productivity"]]
+];
+function classifyTitle(t) {
+  var s = String(t || "").toLowerCase();
+  for (var i = 0; i < CAT_RULES.length; i++) {
+    var kws = CAT_RULES[i][1];
+    for (var j = 0; j < kws.length; j++) if (s.indexOf(kws[j].toLowerCase()) !== -1) return CAT_RULES[i][0];
+  }
+  return "其他";
+}
+var CAT_CLASS = {"AI 大模型":"cb-model","AI 应用":"cb-app","政策与监管":"cb-policy","融资与公司动态":"cb-finance","具身智能与机器人":"cb-robot","其他":"cb-other"};
+
+/* 给所有条目插彩色分类 badge，并记 data-cat 供筛选 */
 (function () {
-  const chips = document.getElementById("src-chips");
+  document.querySelectorAll(".item[data-title]").forEach(function (el) {
+    var cat = classifyTitle(el.getAttribute("data-title"));
+    el.setAttribute("data-cat", cat);
+    var main = el.querySelector(".row-main");
+    if (!main || main.querySelector(".cat-badge")) return;
+    var badge = document.createElement("span");
+    badge.className = "cat-badge " + (CAT_CLASS[cat] || "cb-other");
+    badge.textContent = cat;
+    var anchor = main.querySelector("a.title");
+    main.insertBefore(badge, anchor);
+  });
+  document.dispatchEvent(new CustomEvent("ai:classified"));
+})();
+
+/* ---------- 设置抽屉 ---------- */
+function openSettingsDrawer() {
+  document.body.classList.add("drawer-open");
+  var f = document.getElementById("settings-frame");
+  if (f && !f.getAttribute("src")) f.setAttribute("src", "/settings");
+}
+(function () {
+  var mask = document.getElementById("drawer-mask");
+  document.getElementById("drawer-close").addEventListener("click", function () { document.body.classList.remove("drawer-open"); });
+  if (mask) mask.addEventListener("click", function () { document.body.classList.remove("drawer-open"); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") document.body.classList.remove("drawer-open"); });
+  document.querySelectorAll("[data-open-settings]").forEach(function (b) { b.addEventListener("click", openSettingsDrawer); });
+
+  /* 更新时间：来自现有 /api/health 的 last_fetch */
+  fetch("/api/health").then(function (r) { return r.json(); }).then(function (h) {
+    var el = document.getElementById("u-updated");
+    if (el && h.last_fetch && typeof relTime === "function") {
+      el.textContent = "更新于 " + relTime(h.last_fetch);
+    } else if (el) { el.textContent = "尚未完成抓取"; }
+  }).catch(function () {
+    var el = document.getElementById("u-updated");
+    if (el) el.textContent = "更新时间获取失败";
+  });
+
+  document.getElementById("u-refresh").addEventListener("click", function () { location.reload(); });
+})();
+
+/* ---------- 默认引擎信息：解析 /settings 已渲染 HTML（无独立 JSON 接口，纯前端方案） ---------- */
+var getEngineInfo = (function () {
+  var cached = null;
+  return function () {
+    if (cached) return cached;
+    cached = fetch("/settings").then(function (r) { return r.text(); }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var badge = doc.querySelector(".card.saved .badge");
+      if (!badge) return null; /* 无默认引擎 */
+      var card = badge.closest(".card");
+      var name = card.querySelector(".card-head b").textContent.trim();
+      var model = (card.querySelector(".f-model") || {}).value || "";
+      return { name: name, model: model.trim() };
+    }).catch(function () { return null; });
+    return cached;
+  };
+})();
+(function () {
+  var btn = document.getElementById("u-engine");
+  if (!btn) return;
+  btn.addEventListener("click", openSettingsDrawer);
+  getEngineInfo().then(function (info) {
+    btn.textContent = info ? ("当前：" + info.name + " · " + (info.model || "默认模型")) : "设置模型";
+  });
+})();
+
+/* ---------- 来源筛选 chips（热榜/时间线/收藏） ---------- */
+(function () {
+  var chips = document.getElementById("src-chips");
   if (!chips) return;
-  const items = Array.from(document.querySelectorAll(".item[data-source]"));
+  var items = Array.from(document.querySelectorAll(".item[data-source]"));
   chips.addEventListener("click", function (e) {
-    const btn = e.target.closest(".chip");
+    var btn = e.target.closest(".chip");
     if (!btn) return;
     chips.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("active", c === btn); });
-    const src = btn.dataset.src;
+    var src = btn.dataset.src;
     items.forEach(function (it) {
       it.style.display = (!src || it.dataset.source === src) ? "" : "none";
     });
   });
   chips.querySelectorAll(".chip").forEach(function (c) {
-    const n = c.dataset.src
+    var n = c.dataset.src
       ? items.filter(function (i) { return i.dataset.source === c.dataset.src; }).length
       : items.length;
     c.querySelector(".chip-n").textContent = n;
   });
 })();
-/* 深浅色切换：localStorage 记忆，初始跟随系统（见 head 内早置脚本） */
+
+/* ---------- 深浅色切换 ---------- */
 (function () {
-  const btn = document.getElementById("theme-toggle");
+  var btn = document.getElementById("theme-toggle");
   if (!btn) return;
   var icon = function () { btn.textContent = document.documentElement.dataset.theme === "dark" ? "☀️" : "🌙"; };
   icon();
   btn.addEventListener("click", function () {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    var next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem("theme", next); } catch (e) {}
     icon();
