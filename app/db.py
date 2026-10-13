@@ -227,13 +227,15 @@ def get_hot(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple
     return ranked[start:start + per_page], total
 
 
-def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple[list[dict], int]:
+def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4, profile: dict | None = None) -> tuple[list[dict], int]:
     """故事级热榜：同一事件多源合并为一席（app/stories.py 聚类）。
 
     - 故事热度 = 成员最高 hot_score × (1 + 15%/额外来源)（v0.3.5）
     - 每来源（按代表条目来源计）最多 max_per_source 个故事
+    - profile（v0.3.9）：兴趣画像——命中的故事加分、不感兴趣的过滤（app/profile.py）
     - 返回 (代表条目列表[带 _story 元数据], 故事总数)
     """
+    from .profile import apply_profile_to_stories
     from .stories import group_stories, story_score
 
     with _connect() as conn:
@@ -242,6 +244,7 @@ def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4) 
     stories = group_stories(items)
     for st in stories:
         st["_score"] = story_score(st)
+    stories = apply_profile_to_stories(stories, profile)
     stories.sort(key=lambda s: s["_score"], reverse=True)
     # 故事级分类屏蔽：代表条目的话题被屏蔽则整故事不出现
     _, _, cats = _blocked_sets()

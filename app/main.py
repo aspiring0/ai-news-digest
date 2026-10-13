@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import classifier, db, providers, scheduler, summarizer
+from . import classifier, db, profile as profile_mod, providers, scheduler, summarizer
 from .fetch_all import run_once
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -57,10 +57,11 @@ def index():
 
 
 @app.get("/hot")
-def hot(request: Request, page: int = 1):
-    """热榜（故事级）：同一事件多源合并为一席，代表条目展示 + N 源报道徽标。"""
+def hot(request: Request, page: int = 1, personal: int = 0):
+    """热榜（故事级）：同一事件多源合并为一席。personal=1 应用兴趣画像（为我精选）。"""
     page = max(1, page)
-    items, total = db.get_hot_stories(page=page, per_page=PER_PAGE)
+    prof = profile_mod.load_profile() if personal else None
+    items, total = db.get_hot_stories(page=page, per_page=PER_PAGE, profile=prof)
     items = _mark_bookmarks(items)
     st = db.stats()
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
@@ -81,6 +82,8 @@ def hot(request: Request, page: int = 1):
             "items": items, "stats": st, "page": page,
             "total_pages": total_pages, "total": total,
             "lead_summary": lead_summary,
+            "personal": bool(personal),
+            "has_profile": profile_mod.load_profile() is not None,
         },
     )
 
@@ -239,6 +242,36 @@ def api_add_block(payload: dict):
 def api_delete_block(payload: dict):
     db.delete_block((payload.get("kind") or "").strip(), (payload.get("value") or "").strip())
     return {"ok": True}
+
+
+# ---------------- v0.3.9：兴趣画像（自我进化） ----------------
+
+@app.get("/api/profile")
+def api_get_profile():
+    return {"ok": True, "profile": profile_mod.load_profile()}
+
+
+@app.post("/api/profile")
+def api_save_profile(payload: dict):
+    try:
+        saved = profile_mod.save_profile(payload)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
+    return {"ok": True, "profile": saved}
+
+
+@app.delete("/api/profile")
+def api_clear_profile():
+    profile_mod.clear_profile()
+    return {"ok": True}
+
+
+@app.post("/api/profile/distill")
+def api_distill_profile():
+    result = profile_mod.distill()
+    if not result.get("ok"):
+        return JSONResponse(result, status_code=400)
+    return result
 
 
 # ---------------- 设置页：provider 管理 ----------------

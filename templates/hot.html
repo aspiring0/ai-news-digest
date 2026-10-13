@@ -22,12 +22,18 @@
 <p class="hint">按故事热度排序（同一事件多源合并为一席，多源 +15%/源加成）。点击标题前往原文，「点开汇总」看 AI 解读。共 {{ stats.total }} 条在库。</p>
 {% if items %}
   {% include "_chips.html" %}
-  <p style="margin:-6px 0 12px"><label class="unread-toggle"><input type="checkbox" id="only-unread"> 只看未读</label></p>
+  <p style="margin:-6px 0 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label class="unread-toggle"><input type="checkbox" id="only-unread"> 只看未读</label>
+    <a class="chip {{ 'active' if personal else '' }}" href="{{ '/hot?personal=1' if not personal else '/hot' }}" title="按兴趣画像排序：喜欢的加分、不感兴趣的消失">{{ '★ 为我精选' if not personal else '← 返回普通热榜' }}</a>
+  </p>
+  {% if personal and not has_profile %}
+  <p class="hint" style="color:var(--amber-text);margin:-6px 0 12px">还没有兴趣画像：去 ⚙ 设置 →「兴趣画像」点「学习画像」（会用你的行为日志蒸馏一次）。</p>
+  {% endif %}
   {% for it in items %}{% set rank = loop.index + (page - 1) * 20 %}{% include "_item.html" %}{% endfor %}
   <div class="pager">
-    {% if page > 1 %}<a href="/hot?page={{ page - 1 }}">← 上一页</a>{% endif %}
+    {% if page > 1 %}<a href="/hot?page={{ page - 1 }}{% if personal %}&personal=1{% endif %}">← 上一页</a>{% endif %}
     <span class="cur">第 {{ page }} / {{ total_pages }} 页 · 配额后共 {{ total }} 条</span>
-    {% if page < total_pages %}<a href="/hot?page={{ page + 1 }}">下一页 →</a>{% endif %}
+    {% if page < total_pages %}<a href="/hot?page={{ page + 1 }}{% if personal %}&personal=1{% endif %}">下一页 →</a>{% endif %}
   </div>
 {% else %}
   <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>

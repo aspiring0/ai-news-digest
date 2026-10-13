@@ -149,6 +149,24 @@ if (window.self !== window.top) { document.documentElement.classList.add("in-dra
 </details>
 
 <details class="panel" open>
+  <summary>兴趣画像（自我进化）</summary>
+  <div class="panel-body">
+    <div class="card">
+      <p class="host-hint">画像由你的行为（点摘要/收藏/屏蔽）蒸馏而来，只存本机；命中的故事在「为我精选」里加分，不感兴趣的消失。</p>
+      <div class="row">
+        <button class="btn primary" id="pf-learn">学习画像（AI 蒸馏）</button>
+        <button class="btn" id="pf-reset">重置</button>
+      </div>
+      <div class="msg" id="msg-pf"></div>
+      <div id="pf-view"></div>
+      <div class="row"><label>手动编辑</label><span class="host-hint">JSON：{"likes": […], "dislikes": […]}</span></div>
+      <textarea id="pf-json" style="width:100%;min-height:84px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);padding:6px 8px" placeholder='{"likes": ["具身智能"], "dislikes": ["融资八卦"]}'></textarea>
+      <div class="row"><button class="btn" onclick="saveProfileJson()">保存画像</button></div>
+    </div>
+  </div>
+</details>
+
+<details class="panel" open>
   <summary>自定义 provider（任意 OpenAI-compatible 地址）</summary>
   <div class="panel-body">
     <div class="card" data-pid="__custom_new__">
@@ -305,5 +323,55 @@ function escH(s) {
 }
 loadCustomSources();
 loadBlocks();
+/* ---------- 兴趣画像 ---------- */
+async function loadProfileUI() {
+  const r = await fetch("/api/profile");
+  const d = await r.json();
+  const view = document.getElementById("pf-view");
+  const ta = document.getElementById("pf-json");
+  if (!d.profile) {
+    view.innerHTML = '<p class="host-hint">还没有画像。多点几篇摘要/收藏/屏蔽后，点「学习画像」。</p>';
+    ta.value = "";
+    return;
+  }
+  const p = d.profile;
+  const when = (p.updated_at || "").replace("T", " ").slice(0, 16);
+  view.innerHTML =
+    '<p class="host-hint">更新于 ' + when + ' UTC</p>' +
+    (p.likes || []).map(x => '<span class="badge" style="background:#dbeafe;color:#1d4ed8">' + escH(x) + '</span>').join(" ") +
+    ' &nbsp; ' +
+    (p.dislikes || []).map(x => '<span class="badge" style="background:#fef3c7;color:#b45309">' + escH(x) + '</span>').join(" ");
+  ta.value = JSON.stringify({likes: p.likes || [], dislikes: p.dislikes || [], notes: p.notes || ""}, null, 0);
+}
+document.getElementById("pf-learn").addEventListener("click", async function () {
+  const btn = this, msg = document.getElementById("msg-pf");
+  btn.disabled = true; btn.textContent = "蒸馏中…（约十几秒）";
+  try {
+    const r = await fetch("/api/profile/distill", {method: "POST"});
+    const d = await r.json();
+    if (d.ok) { msg.textContent = "画像已更新"; msg.className = "msg ok"; loadProfileUI(); }
+    else { msg.textContent = d.message || "失败"; msg.className = "msg err"; }
+  } catch (e) { msg.textContent = "网络错误"; msg.className = "msg err"; }
+  btn.disabled = false; btn.textContent = "学习画像（AI 蒸馏）";
+});
+document.getElementById("pf-reset").addEventListener("click", async function () {
+  if (!confirm("重置兴趣画像？")) return;
+  await fetch("/api/profile", {method: "DELETE"});
+  loadProfileUI();
+});
+async function saveProfileJson() {
+  const msg = document.getElementById("msg-pf");
+  let data;
+  try { data = JSON.parse(document.getElementById("pf-json").value); }
+  catch (e) { msg.textContent = "JSON 格式不对"; msg.className = "msg err"; return; }
+  const r = await fetch("/api/profile", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({likes: data.likes || [], dislikes: data.dislikes || [], notes: data.notes || ""})
+  });
+  const d = await r.json();
+  if (d.ok) { msg.textContent = "已保存"; msg.className = "msg ok"; loadProfileUI(); }
+  else { msg.textContent = d.message || "保存失败"; msg.className = "msg err"; }
+}
+loadProfileUI();
 </script>
 {% endblock %}
