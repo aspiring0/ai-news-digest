@@ -10,6 +10,7 @@
   </div>
   <div class="row-sub">
     <button class="sum-btn" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>点开汇总 →</button>
+    <button class="block-btn" title="不感兴趣：屏蔽此条（热榜为整条故事）">✕</button>
     <span class="meta">{{ it.source_name }}{% if it._story is defined and it._story.count > 1 %} 等 {{ it._story.count }} 条{% endif %}{% if it.category is defined and it.category %} · {{ it.category }}{% endif %} ·
       {%- if ts %} <time class="rel" datetime="{{ ts.isoformat() }}">{{ ts.strftime('%m-%d %H:%M') }}</time>
       {%- else %} 时间未知{% endif %}</span>

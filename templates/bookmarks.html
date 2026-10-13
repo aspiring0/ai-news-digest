@@ -6,7 +6,14 @@
 <p class="hint">按收藏时间倒序。取消收藏后刷新页面即消失。</p>
 {% if items %}
   {% include "_chips.html" %}
-  {% for it in items %}{% include "_item.html" %}{% endfor %}
+  {% for it in items %}{% include "_item.html" %}
+    {% if it.snapshot %}
+    <details class="story-members" style="margin-left:0">
+      <summary>存档正文（收藏时抓取，原文失效仍可读）</summary>
+      <div style="white-space:pre-wrap;font-size:13px;max-height:300px;overflow-y:auto">{{ it.snapshot[:3000] }}{% if it.snapshot|length > 3000 %}…{% endif %}</div>
+    </details>
+    {% endif %}
+  {% endfor %}
 {% else %}
   <div class="empty">还没有收藏。在热榜/时间线点 ☆ 即可收藏。</div>
 {% endif %}

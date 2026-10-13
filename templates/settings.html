@@ -125,6 +125,30 @@ if (window.self !== window.top) { document.documentElement.classList.add("in-dra
 </details>
 
 <details class="panel" open>
+  <summary>自定义 RSS 源（零代码扩源）</summary>
+  <div class="panel-body">
+    <div class="card">
+      <div class="row"><label>名称</label><input type="text" id="cs-name" placeholder="如 我的博客"></div>
+      <div class="row"><label>RSS 地址</label><input type="text" id="cs-url" placeholder="https://example.com/feed"></div>
+      <div class="row">
+        <button class="btn primary" onclick="addCustomSource()">添加源</button>
+        <span class="host-hint">下一轮抓取（或点顶栏 ↻）即生效</span>
+      </div>
+      <div class="msg" id="msg-cs"></div>
+    </div>
+    <div id="cs-list"></div>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>屏蔽管理（不感兴趣）</summary>
+  <div class="panel-body">
+    <p class="host-hint">条目上的 ✕ 会加入这里；被屏蔽的 URL/来源/分类不再出现在热榜与时间线。</p>
+    <div id="blocks-list"></div>
+  </div>
+</details>
+
+<details class="panel" open>
   <summary>自定义 provider（任意 OpenAI-compatible 地址）</summary>
   <div class="panel-body">
     <div class="card" data-pid="__custom_new__">
@@ -230,5 +254,56 @@ async function delProvider(pid) {
   await fetch("/api/providers/" + encodeURIComponent(pid), {method: "DELETE"});
   location.reload();
 }
+/* ---------- 自定义 RSS 源 ---------- */
+async function loadCustomSources() {
+  const r = await fetch("/api/custom-sources");
+  const d = await r.json();
+  const box = document.getElementById("cs-list");
+  if (!d.sources.length) { box.innerHTML = '<p class="host-hint">还没有自定义源。</p>'; return; }
+  box.innerHTML = d.sources.map(s =>
+    '<div class="card"><div class="card-head"><b>' + escH(s.name) + '</b><span class="host-hint">' + escH(s.url) + '</span></div>' +
+    '<div class="row"><button class="btn danger" onclick="delCustomSource(' + s.id + ')">删除</button></div></div>'
+  ).join("");
+}
+async function addCustomSource() {
+  const name = document.getElementById("cs-name").value.trim();
+  const url = document.getElementById("cs-url").value.trim();
+  const r = await fetch("/api/custom-sources", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, url})
+  });
+  const d = await r.json();
+  if (d.ok) { document.getElementById("msg-cs").textContent = "已添加，下一轮抓取生效"; document.getElementById("msg-cs").className = "msg ok"; loadCustomSources(); }
+  else { document.getElementById("msg-cs").textContent = d.message || "添加失败"; document.getElementById("msg-cs").className = "msg err"; }
+}
+async function delCustomSource(id) {
+  await fetch("/api/custom-sources/" + id, {method: "DELETE"});
+  loadCustomSources();
+}
+/* ---------- 屏蔽管理 ---------- */
+async function loadBlocks() {
+  const r = await fetch("/api/blocks");
+  const d = await r.json();
+  const box = document.getElementById("blocks-list");
+  if (!d.blocks.length) { box.innerHTML = '<p class="host-hint">暂无屏蔽项。</p>'; return; }
+  box.innerHTML = d.blocks.map(b =>
+    '<div class="card"><div class="card-head"><b>' + ({url: "URL", source: "来源", category: "分类"}[b.kind]) + '</b>' +
+    '<span class="host-hint">' + escH(b.value.slice(0, 60)) + '</span></div>' +
+    '<div class="row"><button class="btn" onclick="unblock(\'' + escH(b.kind) + '\', this)" data-value="' + escH(b.value) + '">解除屏蔽</button></div></div>'
+  ).join("");
+}
+async function unblock(kind, btn) {
+  const value = btn.getAttribute("data-value");
+  await fetch("/api/blocks", {
+    method: "DELETE", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({kind, value})
+  });
+  loadBlocks();
+}
+function escH(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+loadCustomSources();
+loadBlocks();
 </script>
 {% endblock %}

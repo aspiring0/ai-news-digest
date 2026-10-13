@@ -193,6 +193,19 @@
   .health-row .ok{ color:#15803d; } .health-row .fail{ color:var(--amber-text); }
   .health-row small{ color:var(--muted); font-size:11px; }
 
+  /* ---- 条目辅助操作：屏蔽 ✕ / GitHub 一键 ---- */
+  .block-btn{
+    flex-shrink:0; border:none; background:none; color:#c8c4be; cursor:pointer;
+    font-size:12px; padding:0 4px; line-height:1;
+  }
+  .block-btn:hover{ color:var(--amber-text); }
+  .gh-actions{ display:inline-flex; gap:6px; flex-shrink:0; }
+  .gh-actions a{
+    font-size:11px; color:var(--blue); text-decoration:none;
+    border:1px solid var(--border); border-radius:4px; padding:0 6px;
+  }
+  .gh-actions a:hover{ border-color:var(--blue); text-decoration:none; }
+
   /* ---- 日期分组头 ---- */
   .date-head{ margin:20px 0 6px; font-size:12.5px; font-weight:700; color:var(--muted);
               display:flex; align-items:center; gap:8px; letter-spacing:.08em; }
@@ -374,6 +387,50 @@ var getEngineInfo = (function () {
       ? items.filter(function (i) { return i.dataset.source === c.dataset.src; }).length
       : items.length;
     c.querySelector(".chip-n").textContent = n;
+  });
+})();
+
+/* ---------- 条目辅助：GitHub 一键操作 + ✕ 屏蔽 ---------- */
+(function () {
+  /* GitHub 条目（Trending/Releases）注入 Clone / Fork / 部署 */
+  document.querySelectorAll('.item[data-url]').forEach(function (el) {
+    var m = (el.getAttribute("data-url") || "").match(/^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
+    if (!m) return;
+    var repo = m[1], repoUrl = "https://github.com/" + repo;
+    var sub = el.querySelector(".row-sub");
+    if (!sub || sub.querySelector(".gh-actions")) return;
+    var box = document.createElement("span");
+    box.className = "gh-actions";
+    box.innerHTML =
+      '<a href="#" data-act="clone">Clone</a>' +
+      '<a href="' + repoUrl + '/fork" target="_blank" rel="noopener">Fork</a>' +
+      '<a href="https://vercel.com/new/clone?repository-url=' + repoUrl + '" target="_blank" rel="noopener">部署</a>';
+    sub.appendChild(box);
+    box.querySelector('[data-act="clone"]').addEventListener("click", function (e) {
+      e.preventDefault();
+      var cmd = "git clone " + repoUrl + ".git";
+      var a = this;
+      (navigator.clipboard ? navigator.clipboard.writeText(cmd) : Promise.reject())
+        .then(function () { a.textContent = "已复制 ✓"; setTimeout(function () { a.textContent = "Clone"; }, 1500); })
+        .catch(function () { window.prompt("复制 clone 命令：", cmd); });
+    });
+  });
+  /* ✕ 不感兴趣：屏蔽此条（故事则屏蔽全部成员 URL），后端生效后移除元素 */
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".block-btn");
+    if (!btn) return;
+    var item = btn.closest(".item");
+    if (!item) return;
+    var urls = [item.getAttribute("data-url")];
+    item.querySelectorAll(".story-members li a").forEach(function (a) {
+      if (a.href && a.href.indexOf("http") === 0) urls.push(a.href);
+    });
+    Promise.all(urls.map(function (u) {
+      return fetch("/api/blocks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "url", value: u })
+      }).catch(function () { return null; });
+    })).then(function () { item.remove(); });
   });
 })();
 

@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from . import db
 from .fetchers import FETCHERS
+from .fetchers.base import parse_rss
 from .scorer import static_score
 
 logger = logging.getLogger("ai-news-oss")
@@ -45,6 +46,28 @@ def run_once() -> dict:
         except Exception as e:  # noqa: BLE001 - 单个源失败不中断整轮
             summary[name] = {"ok": False, "fetched": 0, "error": str(e), "at": now.isoformat()}
             logger.warning("[%s] 抓取失败: %s", name, e)
+
+    # v0.3.8：用户在设置页添加的自定义 RSS 源（零代码扩源，同样参与健康记录）
+    for cs in db.list_custom_sources():
+        try:
+            cs_items = parse_rss(cs["url"], cs["name"], limit=15)
+            for pos, item in enumerate(cs_items):
+                rows.append(
+                    {
+                        "url": item.url,
+                        "title": item.title,
+                        "source_name": item.source_name,
+                        "published_at": item.published_at,
+                        "fetched_at": now,
+                        "score": static_score("rss", pos, item.score),
+                        "summary": item.summary,
+                    }
+                )
+            summary[cs["name"]] = {"ok": True, "fetched": len(cs_items), "at": now.isoformat()}
+            logger.info("[%s] 抓到 %d 条（自定义源）", cs["name"], len(cs_items))
+        except Exception as e:  # noqa: BLE001
+            summary[cs["name"]] = {"ok": False, "fetched": 0, "error": str(e), "at": now.isoformat()}
+            logger.warning("[%s] 自定义源抓取失败: %s", cs["name"], e)
 
     added, skipped = db.insert_items(rows)
     deleted = db.cleanup()

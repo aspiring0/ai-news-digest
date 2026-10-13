@@ -118,6 +118,8 @@ def api_bookmark(payload: dict):
         state = db.toggle_bookmark(url)
     except KeyError:
         return JSONResponse({"ok": False, "message": "新闻不存在"}, status_code=404)
+    if state:
+        db.log_interaction("bookmark", url)  # 兴趣画像原料
     return {"ok": True, "bookmarked": state}
 
 
@@ -180,6 +182,7 @@ def api_summary(request: Request, url: str, regenerate: int = 0):
             {"ok": False, "message": "摘要暂不可用（正文抓取失败或未配置模型）"},
             status_code=502,
         )
+    db.log_interaction("summary", url, title)  # 兴趣画像原料（v0.3.9 底座）
     return {"ok": True, "summary": result}
 
 
@@ -191,6 +194,51 @@ def api_sources_health():
     raw = db.get_meta("source_health")
     sources = _json.loads(raw) if raw else {}
     return {"ok": True, "sources": sources}
+
+
+# ---------------- v0.3.8：自定义 RSS 源 / 屏蔽 ----------------
+
+@app.get("/api/custom-sources")
+def api_custom_sources():
+    return {"ok": True, "sources": db.list_custom_sources()}
+
+
+@app.post("/api/custom-sources")
+def api_add_custom_source(payload: dict):
+    try:
+        db.add_custom_source((payload.get("name") or "").strip(), (payload.get("url") or "").strip())
+    except ValueError as e:
+        return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
+    return {"ok": True}
+
+
+@app.delete("/api/custom-sources/{sid}")
+def api_del_custom_source(sid: int):
+    db.delete_custom_source(sid)
+    return {"ok": True}
+
+
+@app.get("/api/blocks")
+def api_blocks():
+    return {"ok": True, "blocks": db.list_blocks()}
+
+
+@app.post("/api/blocks")
+def api_add_block(payload: dict):
+    try:
+        kind = (payload.get("kind") or "").strip()
+        value = (payload.get("value") or "").strip()
+        db.add_block(kind, value)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
+    db.log_interaction("block", value)
+    return {"ok": True}
+
+
+@app.delete("/api/blocks")
+def api_delete_block(payload: dict):
+    db.delete_block((payload.get("kind") or "").strip(), (payload.get("value") or "").strip())
+    return {"ok": True}
 
 
 # ---------------- 设置页：provider 管理 ----------------

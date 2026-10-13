@@ -90,4 +90,6 @@ def clean_db():
     with db._connect() as conn:
         conn.execute("DELETE FROM news_items")
         conn.execute("DELETE FROM provider_settings")
+        conn.execute("DELETE FROM blocks")
+        conn.execute("DELETE FROM custom_sources")
     return db

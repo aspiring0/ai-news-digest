@@ -1,10 +1,11 @@
-"""SQLite 存取：按 URL 去重、14 天清理、热榜/时间线查询。"""
+"""SQLite 存取：按 URL 去重、14 天清理、热榜/时间线查询、收藏快照、自定义源、屏蔽。"""
 from __future__ import annotations
 
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from .classifier import classify
 from .scorer import hot_score
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "news.db"))
@@ -66,7 +67,47 @@ def init_db() -> None:
                 url TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 source_name TEXT NOT NULL,
-                bookmarked_at TEXT NOT NULL  -- ISO8601 UTC
+                bookmarked_at TEXT NOT NULL,  -- ISO8601 UTC
+                snapshot TEXT                 -- v0.3.8：收藏时的正文快照（原文失效后仍可读）
+            )
+            """
+        )
+        # v0.3.8：存量库给 bookmarks 补 snapshot 列
+        bcols = {r[1] for r in conn.execute("PRAGMA table_info(bookmarks)")}
+        if "snapshot" not in bcols:
+            conn.execute("ALTER TABLE bookmarks ADD COLUMN snapshot TEXT")
+        # v0.3.8：自定义 RSS 源（设置页 UI 添加，零代码扩源）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL UNIQUE,
+                added_at TEXT NOT NULL
+            )
+            """
+        )
+        # v0.3.8：屏蔽（不感兴趣）：kind ∈ url / source / category
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS blocks (
+                kind TEXT NOT NULL,
+                value TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (kind, value)
+            )
+            """
+        )
+        # v0.3.9 底座：行为日志（兴趣画像蒸馏的原料）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS interactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                action TEXT NOT NULL,        -- summary / bookmark / block
+                url TEXT,
+                title TEXT,
+                source_name TEXT
             )
             """
         )
@@ -197,11 +238,15 @@ def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4) 
 
     with _connect() as conn:
         rows = conn.execute("SELECT * FROM news_items").fetchall()
-    items = [_row_to_dict(r) for r in rows]
+    items = _filter_blocked([_row_to_dict(r) for r in rows])
     stories = group_stories(items)
     for st in stories:
         st["_score"] = story_score(st)
     stories.sort(key=lambda s: s["_score"], reverse=True)
+    # 故事级分类屏蔽：代表条目的话题被屏蔽则整故事不出现
+    _, _, cats = _blocked_sets()
+    if cats:
+        stories = [s for s in stories if classify(s["representative"]["title"]) not in cats]
 
     ranked: list[dict] = []
     per_source: dict[str, int] = {}
@@ -227,14 +272,14 @@ def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4) 
 
 
 def get_timeline(page: int = 1, per_page: int = 20) -> tuple[list[dict], int]:
-    """时间线：按发布时间倒序分页（无发布时间的按入库时间）。返回 (条目, 总数)。"""
+    """时间线：按发布时间倒序分页（无发布时间的按入库时间），应用屏蔽过滤。返回 (条目, 总数)。"""
     with _connect() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM news_items").fetchone()[0]
-        rows = conn.execute(
-            "SELECT * FROM news_items ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT ? OFFSET ?",
-            (per_page, (page - 1) * per_page),
-        ).fetchall()
-    return [_row_to_dict(r) for r in rows], total
+        rows = conn.execute("SELECT * FROM news_items").fetchall()
+    items = _filter_blocked([_row_to_dict(r) for r in rows])
+    items.sort(key=lambda x: x["published_at"] or x["fetched_at"], reverse=True)
+    total = len(items)
+    start = (page - 1) * per_page
+    return items[start:start + per_page], total
 
 
 def stats() -> dict:
@@ -265,20 +310,28 @@ def get_meta(key: str) -> str | None:
 # ---------------- v0.2：收藏 ----------------
 
 def toggle_bookmark(url: str) -> bool:
-    """收藏/取消收藏。返回 True=已收藏，False=已取消。"""
+    """收藏/取消收藏。收藏时抓正文快照（原文失效后仍可读）。返回 True=已收藏。"""
     with _connect() as conn:
         exists = conn.execute("SELECT 1 FROM bookmarks WHERE url = ?", (url,)).fetchone()
         if exists:
             conn.execute("DELETE FROM bookmarks WHERE url = ?", (url,))
             return False
         item = conn.execute(
-            "SELECT title, source_name FROM news_items WHERE url = ?", (url,)
+            "SELECT title, source_name, summary FROM news_items WHERE url = ?", (url,)
         ).fetchone()
         if not item:
             raise KeyError("新闻不存在")
+        snapshot = None
+        try:
+            from . import summarizer
+            snapshot = summarizer.fetch_article_text(url, rss_summary=(item["summary"] or ""))
+        except Exception:
+            snapshot = None
+        if not snapshot:
+            snapshot = (item["summary"] or "") or None
         conn.execute(
-            "INSERT INTO bookmarks (url, title, source_name, bookmarked_at) VALUES (?, ?, ?, ?)",
-            (url, item["title"], item["source_name"], _iso(datetime.now(timezone.utc))),
+            "INSERT INTO bookmarks (url, title, source_name, bookmarked_at, snapshot) VALUES (?, ?, ?, ?, ?)",
+            (url, item["title"], item["source_name"], _iso(datetime.now(timezone.utc)), snapshot),
         )
         return True
 
@@ -301,10 +354,107 @@ def get_bookmarks() -> list[dict]:
             "source_name": r["source_name"],
             "bookmarked_at": _parse(r["bookmarked_at"]),
             "bookmarked": True,
+            "snapshot": r["snapshot"] if "snapshot" in r.keys() else None,
         }
         for r in rows
     ]
 
+
+# ---------------- v0.3.8：自定义 RSS 源 / 屏蔽 / 行为日志 ----------------
+
+def list_custom_sources() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT * FROM custom_sources ORDER BY id").fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_custom_source(name: str, url: str) -> None:
+    from urllib.parse import urlparse
+
+    name = (name or "").strip()
+    url = (url or "").strip()
+    if not name:
+        raise ValueError("名称不能为空")
+    if not url.startswith(("http://", "https://")) or not urlparse(url).hostname:
+        raise ValueError("RSS 地址必须是合法的 http(s) URL")
+    try:
+        with _connect() as conn:
+            conn.execute(
+                "INSERT INTO custom_sources (name, url, added_at) VALUES (?, ?, ?)",
+                (name[:50], url, _iso(datetime.now(timezone.utc))),
+            )
+    except sqlite3.IntegrityError as e:
+        raise ValueError("该 RSS 地址已添加过") from e
+
+
+def delete_custom_source(sid: int) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM custom_sources WHERE id = ?", (sid,))
+
+
+_BLOCK_KINDS = ("url", "source", "category")
+
+
+def add_block(kind: str, value: str) -> None:
+    if kind not in _BLOCK_KINDS:
+        raise ValueError("kind 必须是 url / source / category")
+    value = (value or "").strip()
+    if not value:
+        raise ValueError("value 不能为空")
+    with _connect() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO blocks (kind, value, created_at) VALUES (?, ?, ?)",
+            (kind, value, _iso(datetime.now(timezone.utc))),
+        )
+
+
+def delete_block(kind: str, value: str) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM blocks WHERE kind = ? AND value = ?", (kind, value))
+
+
+def list_blocks() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT kind, value FROM blocks ORDER BY created_at DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def _blocked_sets() -> tuple[set[str], set[str], set[str]]:
+    """返回 (屏蔽URL集, 屏蔽来源集, 屏蔽分类集)。"""
+    urls, srcs, cats = set(), set(), set()
+    for b in list_blocks():
+        {"url": urls, "source": srcs, "category": cats}.get(b["kind"], set()).add(b["value"])
+    return urls, srcs, cats
+
+
+def _filter_blocked(items: list[dict]) -> list[dict]:
+    """条目级过滤：屏蔽的 URL / 来源 / 分类（分类按标题关键词规则）。"""
+    urls, srcs, cats = _blocked_sets()
+    if not (urls or srcs or cats):
+        return items
+    return [
+        it for it in items
+        if it["url"] not in urls
+        and it["source_name"] not in srcs
+        and classify(it["title"]) not in cats
+    ]
+
+
+def log_interaction(action: str, url: str = "", title: str = "", source_name: str = "") -> None:
+    """记录行为（summary/bookmark/block），兴趣画像蒸馏的原料。"""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO interactions (ts, action, url, title, source_name) VALUES (?, ?, ?, ?, ?)",
+            (_iso(datetime.now(timezone.utc)), action, url, title[:200], source_name[:60]),
+        )
+
+
+def recent_interactions(limit: int = 500) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM interactions ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 # ---------------- v0.2：摘要缓存 ----------------
 
