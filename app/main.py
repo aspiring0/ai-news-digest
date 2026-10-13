@@ -64,10 +64,24 @@ def hot(request: Request, page: int = 1):
     items = _mark_bookmarks(items)
     st = db.stats()
     total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    # 头条特殊处理（v0.3.7）：top1 有摘要缓存时，lead 区内联中文解释
+    lead_summary = None
+    if page == 1 and items:
+        cached = db.get_summary(items[0]["url"])
+        if cached:
+            plain = cached.get("plain", "")
+            lead_summary = {
+                "core": cached.get("core", ""),
+                "plain": (plain[:160] + "…") if len(plain) > 160 else plain,
+            }
     return templates.TemplateResponse(
         request,
         "hot.html",
-        {"items": items, "stats": st, "page": page, "total_pages": total_pages, "total": total},
+        {
+            "items": items, "stats": st, "page": page,
+            "total_pages": total_pages, "total": total,
+            "lead_summary": lead_summary,
+        },
     )
 
 

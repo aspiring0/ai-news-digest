@@ -70,6 +70,11 @@ def _hot_of(it: dict) -> float:
     return float(it.get("hot_score", it.get("score", 0.0)))
 
 
+def _has_cjk(title: str) -> bool:
+    """标题是否含 CJK 字符（用于代表条目优先中文，用户看得懂）。"""
+    return any("\u4e00" <= ch <= "\u9fff" for ch in (title or ""))
+
+
 def group_stories(items: list[dict], window_hours: float = 48.0) -> list[dict]:
     """把条目聚成故事。返回 [{entities, sources, members, representative, last_time}]。"""
     stories: list[dict] = []
@@ -100,7 +105,9 @@ def group_stories(items: list[dict], window_hours: float = 48.0) -> list[dict]:
                 best["sources"].append(it["source_name"])
     for st in stories:
         st["members"].sort(key=_hot_of, reverse=True)
-        st["representative"] = st["members"][0]
+        # 代表条目：优先中文标题（用户可读），中文内仍取最高分；全英文回到最高分
+        cn_members = [m for m in st["members"] if _has_cjk(m.get("title", ""))]
+        st["representative"] = (cn_members or st["members"])[0]
         # 来源顺序跟随成员热度（代表来源排第一，供前端展示）
         ordered: list[str] = []
         for m in st["members"]:
