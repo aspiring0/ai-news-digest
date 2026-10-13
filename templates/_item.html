@@ -1,6 +1,7 @@
 {% set ts = it.published_at or it.fetched_at or it.bookmarked_at %}
-<div class="item"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}>
-  {% if it.hot_score is defined %}<span class="score">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
+<div class="item" data-source="{{ it.source_name }}"{% if ts %} data-ts="{{ ts.isoformat() }}"{% endif %}>
+  {% if rank is defined and rank <= 3 %}<span class="rank r{{ rank }}" title="第 {{ rank }} 名">{{ rank }}</span>{% endif %}
+  {% if it.hot_score is defined %}<span class="score" title="热度分">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
   <a class="title" href="javascript:void(0)" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>{{ it.title }}</a>
   <button class="sum-btn" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>摘要</button>
   <span class="spacer"></span>

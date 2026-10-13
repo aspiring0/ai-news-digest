@@ -5,6 +5,7 @@
 <h1>🕘 时间线</h1>
 <p class="hint">按发布时间倒序，共 {{ total }} 条。点击标题或「摘要」查看 AI 解读。</p>
 {% if items %}
+  {% include "_chips.html" %}
   <div id="timeline-list">
   {% for it in items %}{% include "_item.html" %}{% endfor %}
   </div>
@@ -17,23 +18,31 @@
   <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>
 {% endif %}
 <script>
-  /* 日期分组头：按浏览器本地时区的自然日，把同一日期的条目归到一组 */
+  /* 日期分组头：按浏览器本地时区的自然日分组，并统计当日条数 */
   (function () {
     const list = document.getElementById("timeline-list");
     if (!list) return;
     const today = new Date();
-    const todayKey = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate();
+    const keyOf = d => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+    const todayKey = keyOf(today);
     const yesterday = new Date(today.getTime() - 86400000);
-    const yKey = yesterday.getFullYear() + "-" + (yesterday.getMonth() + 1) + "-" + yesterday.getDate();
+    const yKey = keyOf(yesterday);
+    const items = Array.from(list.querySelectorAll(".item[data-ts]"));
+    const counts = {};
+    items.forEach(el => {
+      const k = keyOf(new Date(el.getAttribute("data-ts")));
+      counts[k] = (counts[k] || 0) + 1;
+    });
     let last = null;
-    list.querySelectorAll(".item[data-ts]").forEach(function (el) {
+    items.forEach(el => {
       const d = new Date(el.getAttribute("data-ts"));
-      const key = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+      const key = keyOf(d);
       if (key === last) return;
       last = key;
+      const label = key === todayKey ? "今天" : (key === yKey ? "昨天" : (d.getMonth() + 1) + " 月 " + d.getDate() + " 日");
       const head = document.createElement("div");
       head.className = "date-head";
-      head.textContent = key === todayKey ? "今天" : (key === yKey ? "昨天" : (d.getMonth() + 1) + " 月 " + d.getDate() + " 日");
+      head.textContent = label + " · " + counts[key] + " 条";
       list.insertBefore(head, el);
     });
   })();

@@ -16,7 +16,7 @@
   .modal.hidden { display: none; }
   .modal { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex;
            align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-  .modal-card { background: #fff; border-radius: 12px; max-width: 640px; width: 100%;
+  .modal-card { background: var(--card, #fff); color: var(--text, #1f2328); border-radius: 12px; max-width: 640px; width: 100%;
                 max-height: 85vh; display: flex; flex-direction: column;
                 box-shadow: 0 20px 50px rgba(0,0,0,.2); }
   .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -29,15 +29,15 @@
   .sec h4 { margin: 0 0 4px; font-size: 13px; color: var(--blue, #2563eb); }
   .sec p { margin: 0; overflow-wrap: anywhere; }
   .sum-link-section a { word-break: break-all; }
-  .sum-cached { font-size: 11px; color: #9ca3af; margin: 10px 0 0; }
+  .sum-cached { font-size: 11px; color: var(--muted, #9ca3af); margin: 10px 0 0; }
   .sum-err { color: #b91c1c; margin: 8px 0; }
-  .loading { color: #999; margin: 8px 0; }
+  .loading { color: var(--muted, #999); margin: 8px 0; }
   .modal-foot { padding: 12px 16px; border-top: 1px solid var(--border, #e5e7eb);
                 display: flex; gap: 10px; }
-  .btn { border: 1px solid var(--border, #e5e7eb); background: #f9fafb; border-radius: 6px;
-         padding: 6px 14px; cursor: pointer; font-size: 13px; text-decoration: none; color: var(--text, #1f2328); }
+  .btn { border: 1px solid var(--border, #e5e7eb); background: var(--bg, #f9fafb); color: var(--text, #1f2328);
+         border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; text-decoration: none; }
   .btn.link { color: var(--blue, #2563eb); }
-  .btn:hover { background: #f0f2f5; }
+  .btn:hover { filter: brightness(.96); }
   @media (max-width: 640px) { .modal { padding: 10px; } }
 </style>
 <script>
@@ -93,18 +93,22 @@ function esc(s) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });
 }
-/* 相对时间：<time class="rel" datetime="ISO"> → 刚刚 / x 分钟前 / x 小时前 / 昨天 / x 天前 */
+/* 相对时间：今天显示「HH:MM · 刚刚/x 分钟前/x 小时前」，昨天带时间，更早回落日期 */
 function relTime(iso) {
-  const sec = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (sec < 60) return "刚刚";
+  const d = new Date(iso);
+  const now = new Date();
+  const sec = (now.getTime() - d.getTime()) / 1000;
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sec < 60) return sameDay ? hm + " · 刚刚" : hm;
   const m = Math.floor(sec / 60);
-  if (m < 60) return m + " 分钟前";
+  if (m < 60) return sameDay ? hm + " · " + m + " 分钟前" : hm;
   const h = Math.floor(m / 60);
-  if (h < 24) return h + " 小时前";
-  const d = Math.floor(h / 24);
-  if (d === 1) return "昨天";
-  if (d < 15) return d + " 天前";
-  return new Date(iso).toLocaleDateString();
+  if (sameDay && h < 24) return hm + " · " + h + " 小时前";
+  const dd = Math.floor(h / 24);
+  if (dd === 1) return "昨天 " + hm;
+  if (dd < 15) return dd + " 天前";
+  return (d.getMonth() + 1) + "-" + d.getDate();
 }
 document.querySelectorAll("time.rel").forEach(function (t) {
   t.textContent = relTime(t.getAttribute("datetime"));

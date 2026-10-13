@@ -5,7 +5,8 @@
 <h1>🔥 今日热榜</h1>
 <p class="hint">按时间衰减热度排序（hot_score = 原始分 × 0.5^(小时/48)）。点击标题或「摘要」查看 AI 解读。共 {{ stats.total }} 条在库。</p>
 {% if items %}
-  {% for it in items %}{% include "_item.html" %}{% endfor %}
+  {% include "_chips.html" %}
+  {% for it in items %}{% set rank = loop.index %}{% include "_item.html" %}{% endfor %}
 {% else %}
   <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>
 {% endif %}

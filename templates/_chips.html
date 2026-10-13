@@ -1,0 +1,9 @@
+{% if items %}
+  {% set sources = items | map(attribute='source_name') | unique | list %}
+  {% if sources | length > 1 %}
+  <div class="chips" id="src-chips">
+    <button class="chip active" data-src="">全部<span class="chip-n"></span></button>
+    {% for s in sources %}<button class="chip" data-src="{{ s }}">{{ s }}<span class="chip-n"></span></button>{% endfor %}
+  </div>
+  {% endif %}
+{% endif %}
