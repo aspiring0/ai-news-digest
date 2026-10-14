@@ -576,9 +576,12 @@ def api_chat_clear(session_id: str = ""):
 
 
 @app.get("/api/logs")
-def api_logs(lines: int = 100, level: str = ""):
-    """查看最近日志（文件持久化，重启不丢）。可按级别过滤。"""
+def api_logs(lines: int = 100, level: str = "", module: str = ""):
+    """查看最近日志。可按级别（WARNING/ERROR）或模块（agent/ai-news-oss等）过滤。"""
     from .logutil import read_recent_logs
 
     lines = max(1, min(lines, 500))
-    return {"ok": True, "lines": read_recent_logs(lines, level)}
+    result = read_recent_logs(lines, level)
+    if module:
+        result = [l for l in result if f"[{module}]" in l or module in l]
+    return {"ok": True, "lines": result}

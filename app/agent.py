@@ -206,28 +206,34 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
     """
     provider = get_default()
     if not provider:
+        logger.warning("[agent] 无默认引擎，拒绝请求 session=%s", session_id)
         yield {"type": "error", "message": "请先在设置页配置默认解读引擎"}
         return
 
     session_id = session_id or str(uuid.uuid4())[:8]
     session = _sessions.setdefault(session_id, {"messages": [], "pending_action": None})
     history = session["messages"]
+    agent_start = time.time()
 
     # 确认流：有 pending_action 且用户说"是" → 执行
     if session["pending_action"]:
         pending = session["pending_action"]
         session["pending_action"] = None
         if _is_affirmative(user_message):
+            logger.info("[agent] 确认执行 session=%s tool=%s args=%s", session_id, pending["tool"],
+                        json.dumps(pending["args"], ensure_ascii=False)[:100])
             yield {"type": "tool", "tool": pending["tool"], "args": pending["args"]}
             result = _execute_pending(pending)
             desc = _TOOL_DESCRIPTIONS.get(pending["tool"], pending["tool"])
             reply = result.get("message", "操作完成") if result.get("ok") else f"❌ {result.get('message', '失败')}"
+            logger.info("[agent] 确认结果 session=%s ok=%s reply=%s", session_id, result.get("ok"), reply[:50])
             history.append({"role": "user", "content": user_message})
             history.append({"role": "assistant", "content": reply})
             yield {"type": "reply", "content": reply}
             yield {"type": "done", "session_id": session_id}
             return
         elif _is_negative(user_message):
+            logger.info("[agent] 用户取消 session=%s pending_tool=%s", session_id, pending["tool"])
             history.append({"role": "user", "content": user_message})
             reply = "好的，已取消。"
             history.append({"role": "assistant", "content": reply})
@@ -245,6 +251,8 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
         user_content = "\n".join(ctx_lines) + f"\n\n用户说：{user_message}"
 
     history.append({"role": "user", "content": user_content})
+    logger.info("[agent] 开始 session=%s msg=%q ctx=%d条 迭代上限=%d", session_id, user_message[:50],
+                len(page_context or []), MAX_ITERATIONS)
 
     # 构建消息列表
     all_messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
@@ -255,15 +263,24 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
     start = time.time()
 
     try:
-        for _iteration in range(MAX_ITERATIONS):
+        for iteration in range(MAX_ITERATIONS):
             if time.time() - start > TIMEOUT_SECONDS:
+                logger.warning("[agent] 超时 session=%s elapsed=%.1fs", session_id, time.time() - start)
                 break
 
+            llm_start = time.time()
             llm_result = _call_llm(provider, all_messages, TOOL_SCHEMAS)
+            llm_ms = int((time.time() - llm_start) * 1000)
+            logger.info("[agent] LLM调用 session=%s iter=%d 耗时=%dms tool_calls=%s",
+                        session_id, iteration + 1, llm_ms,
+                        [tc["name"] for tc in llm_result["tool_calls"]] if llm_result["tool_calls"] else "无(最终回答)")
 
             if not llm_result["tool_calls"]:
                 reply = llm_result["content"] or "抱歉，我没有得到有效回复。"
                 history.append({"role": "assistant", "content": reply})
+                logger.info("[agent] 完成 session=%s 总耗时=%.1fs 迭代=%d 工具调用=%d 回复长度=%d",
+                            session_id, time.time() - agent_start, iteration + 1,
+                            len(tool_calls_log), len(reply))
                 yield {"type": "reply", "content": reply}
                 if sources_used:
                     yield {"type": "sources", "items": sources_used[:10]}
@@ -296,6 +313,7 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                 if tool_name in WRITE_TOOLS:
                     desc = _TOOL_DESCRIPTIONS.get(tool_name, tool_name)
                     arg_desc = ", ".join(f"{k}={str(v)[:50]}" for k, v in tool_args.items())
+                    logger.info("[agent] 请求确认 session=%s tool=%s args=%s", session_id, tool_name, arg_desc[:80])
                     yield {"type": "confirm", "action": tool_name,
                            "description": f"{desc}（{arg_desc}）",
                            "args": tool_args}
@@ -313,14 +331,19 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                     return
 
                 # ── 读操作直接执行 ──
+                tool_start = time.time()
                 yield {"type": "tool", "tool": tool_name, "args": tool_args}
                 try:
                     result = tool_fn(**tool_args)
                 except Exception as e:  # noqa: BLE001
                     result = {"error": f"工具执行失败: {e}"}
+                tool_ms = int((time.time() - tool_start) * 1000)
 
                 result_str = json.dumps(result, ensure_ascii=False, default=str)[:TOOL_RESULT_MAX_CHARS]
                 all_messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
+                logger.info("[agent] 工具 session=%s tool=%s 耗时=%dms 结果=%s",
+                            session_id, tool_name, tool_ms,
+                            f"{len(result)}条" if isinstance(result, list) else str(result)[:80])
 
                 if isinstance(result, list):
                     yield {"type": "tool_result", "tool": tool_name, "count": len(result)}
@@ -334,15 +357,17 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                     yield {"type": "tool_result", "tool": tool_name}
                     tool_calls_log.append({"tool": tool_name, "args": tool_args})
 
+        logger.warning("[agent] 达到最大迭代 session=%s iterations=%d tools=%d", session_id, MAX_ITERATIONS, len(tool_calls_log))
         reply = "基于已有信息，我暂时无法得到更完整的答案。请尝试换一个问法。"
         history.append({"role": "assistant", "content": reply})
         yield {"type": "reply", "content": reply}
         yield {"type": "done", "session_id": session_id}
 
     except requests.Timeout:
+        logger.warning("[agent] LLM超时 session=%s elapsed=%.1fs", session_id, time.time() - start)
         yield {"type": "error", "message": "模型调用超时，请稍后重试"}
     except Exception as e:  # noqa: BLE001
-        logger.warning("Agent 异常: %s", e)
+        logger.error("[agent] 异常 session=%s error=%s", session_id, e, exc_info=True)
         yield {"type": "error", "message": f"Agent 出错: {e}"}
 
 
