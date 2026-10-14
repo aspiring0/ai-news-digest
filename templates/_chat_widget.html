@@ -1,0 +1,167 @@
+<!-- Agent 聊天框：右下角浮动，全站共享 -->
+<div id="chat-fab" title="AI 资讯助手">💬</div>
+<div id="chat-panel" class="hidden">
+  <div class="chat-head">
+    <b>AI 资讯助手</b>
+    <span>
+      <button id="chat-clear" title="清空对话" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
+      <button id="chat-close" title="收起" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
+    </span>
+  </div>
+  <div id="chat-messages" class="chat-body">
+    <div class="chat-hint">用自然语言操控你的资讯台：<br>·「最近有什么 Claude 新闻？」<br>·「热榜前 5 给我看看」<br>·「这条帮我收藏一下」<br>·「别再推融资类的了」</div>
+  </div>
+  <div id="chat-tools" class="chat-tools hidden"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chat-input" placeholder="输入消息…" aria-label="消息">
+    <button id="chat-send">发送</button>
+  </div>
+</div>
+
+<style>
+  #chat-fab {
+    position: fixed; bottom: 20px; right: 20px; z-index: 80;
+    width: 48px; height: 48px; border-radius: 50%; border: none;
+    background: var(--blue); color: #fff; font-size: 22px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2); display: flex; align-items: center; justify-content: center;
+  }
+  #chat-fab:hover { transform: scale(1.08); }
+  #chat-panel.hidden { display: none; }
+  #chat-panel {
+    position: fixed; bottom: 80px; right: 20px; z-index: 81;
+    width: min(400px, calc(100vw - 32px));
+    max-height: min(560px, calc(100vh - 120px));
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .chat-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 2px solid var(--text); background: var(--bg);
+  }
+  .chat-head b { font-family: var(--serif); font-size: 14px; }
+  .chat-body {
+    flex: 1; overflow-y: auto; padding: 12px; font-size: 13.5px; line-height: 1.65;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .chat-hint { color: var(--muted); font-size: 12px; text-align: center; padding: 16px 8px; line-height: 2; }
+  .chat-msg { max-width: 88%; padding: 8px 12px; border-radius: 10px; overflow-wrap: anywhere; }
+  .chat-msg.user { align-self: flex-end; background: var(--blue-bg); color: var(--blue-dark); border: 1px solid var(--blue); }
+  .chat-msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); }
+  .chat-msg.bot .chat-sources { margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .chat-msg.bot .chat-sources a { color: var(--blue); text-decoration: none; }
+  .chat-loading { color: var(--muted); font-size: 12px; align-self: flex-start; padding: 4px 12px; }
+  .chat-loading::after { content: "…"; animation: dots 1.5s infinite; }
+  @keyframes dots { 0%,100%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+  .chat-tools {
+    padding: 6px 12px; border-top: 1px dashed var(--border); font-size: 11px; color: var(--muted);
+    max-height: 80px; overflow-y: auto; background: var(--bg);
+  }
+  .chat-tools.hidden { display: none; }
+  .chat-tools .tool-line { margin: 2px 0; }
+  .chat-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+  .chat-input-row input {
+    flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 13px;
+  }
+  .chat-input-row input:focus { outline: none; border-color: var(--blue); }
+  .chat-input-row button {
+    border: none; background: var(--blue); color: #fff; border-radius: 8px;
+    padding: 6px 16px; font-size: 13px; cursor: pointer;
+  }
+  .chat-input-row button:disabled { opacity: .5; }
+</style>
+
+<script>
+(function () {
+  var fab = document.getElementById("chat-fab");
+  var panel = document.getElementById("chat-panel");
+  var msgs = document.getElementById("chat-messages");
+  var input = document.getElementById("chat-input");
+  var sendBtn = document.getElementById("chat-send");
+  var toolsBox = document.getElementById("chat-tools");
+  var sessionId = "";
+
+  fab.addEventListener("click", function () {
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) input.focus();
+  });
+  document.getElementById("chat-close").addEventListener("click", function () {
+    panel.classList.add("hidden");
+  });
+  document.getElementById("chat-clear").addEventListener("click", async function () {
+    if (sessionId) await fetch("/api/chat?session_id=" + encodeURIComponent(sessionId), { method: "DELETE" });
+    sessionId = "";
+    msgs.innerHTML = '<div class="chat-hint">用自然语言操控你的资讯台：<br>·「最近有什么 Claude 新闻？」<br>·「热榜前 5 给我看看」<br>·「这条帮我收藏一下」<br>·「别再推融资类的了」</div>';
+    toolsBox.classList.add("hidden");
+  });
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function addMsg(role, text, sources, toolCalls) {
+    var el = document.createElement("div");
+    el.className = "chat-msg " + role;
+    var html = esc(text).replace(/\n/g, "<br>");
+    if (sources && sources.length) {
+      html += '<div class="chat-sources">📎 ';
+      html += sources.slice(0, 5).map(function (s) {
+        try { var p = JSON.parse(s); return '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc((p.title || "").slice(0, 30)) + "</a>"; }
+        catch (e) { return ""; }
+      }).join(" · ");
+      html += "</div>";
+    }
+    el.innerHTML = html;
+    msgs.appendChild(el);
+    msgs.scrollTop = msgs.scrollHeight;
+    if (toolCalls && toolCalls.length) {
+      toolsBox.classList.remove("hidden");
+      toolsBox.innerHTML = toolCalls.map(function (tc) {
+        return '<div class="tool-line">🔧 ' + esc(tc.tool) + "(" + esc(JSON.stringify(tc.args || {})).slice(0, 60) + ")" +
+          (tc.result_count !== undefined ? " → " + tc.result_count + " 条" : " → ✓") + "</div>";
+      }).join("");
+    }
+  }
+
+  async function send() {
+    var text = input.value.trim();
+    if (!text || sendBtn.disabled) return;
+    input.value = "";
+    sendBtn.disabled = true;
+    addMsg("user", text);
+    var loading = document.createElement("div");
+    loading.className = "chat-loading";
+    loading.textContent = "思考中";
+    msgs.appendChild(loading);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    try {
+      var r = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId })
+      });
+      var d = await r.json();
+      loading.remove();
+      if (d.ok) {
+        sessionId = d.session_id;
+        addMsg("bot", d.reply, d.sources, d.tool_calls);
+      } else {
+        addMsg("bot", "❌ " + (d.message || "出错了"));
+      }
+    } catch (e) {
+      loading.remove();
+      addMsg("bot", "❌ 网络错误");
+    }
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  sendBtn.addEventListener("click", send);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>
