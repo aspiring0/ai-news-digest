@@ -1,6 +1,7 @@
-"""SQLite 存取：按 URL 去重、14 天清理、热榜/时间线查询、收藏快照、自定义源、屏蔽。"""
+"""SQLite 存取：URL 去重、14 天清理、热榜/时间线查询、全文搜索、收藏快照、自定义源、屏蔽。"""
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -10,6 +11,10 @@ from .scorer import hot_score
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "news.db"))
 RETENTION_DAYS = 14
+
+# 数据版本：入库/清理时 +1，用于热榜缓存失效
+_data_version = 0
+_hot_cache: dict = {"key": None, "ranked": None}
 
 
 def _connect() -> sqlite3.Connection:
@@ -111,6 +116,31 @@ def init_db() -> None:
             )
             """
         )
+        # v0.4.1：全文搜索（FTS5，标题/来源/RSS 摘要），触发器保持同步 + 存量回填
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS news_items_fts USING fts5"
+            "(title, source_name, summary, url UNINDEXED)"
+        )
+        conn.executescript(
+            """
+            CREATE TRIGGER IF NOT EXISTS news_items_fts_ai AFTER INSERT ON news_items BEGIN
+              INSERT INTO news_items_fts(rowid, title, source_name, summary, url)
+              VALUES (new.rowid, new.title, new.source_name, new.summary, new.url);
+            END;
+            CREATE TRIGGER IF NOT EXISTS news_items_fts_ad AFTER DELETE ON news_items BEGIN
+              DELETE FROM news_items_fts WHERE rowid = old.rowid;
+            END;
+            CREATE TRIGGER IF NOT EXISTS news_items_fts_au AFTER UPDATE OF summary ON news_items BEGIN
+              UPDATE news_items_fts SET title = new.title, source_name = new.source_name, summary = new.summary
+              WHERE rowid = new.rowid;
+            END;
+            """
+        )
+        if not conn.execute("SELECT 1 FROM news_items_fts LIMIT 1").fetchone():
+            conn.execute(
+                "INSERT INTO news_items_fts(rowid, title, source_name, summary, url)"
+                " SELECT rowid, title, source_name, summary, url FROM news_items"
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS provider_settings (
@@ -147,6 +177,8 @@ def _parse(s: str | None) -> datetime | None:
 
 def insert_items(rows: list[dict]) -> tuple[int, int]:
     """批量入库；按 URL 去重（已存在则跳过，但会回填缺失的 RSS 摘要）。返回 (新增数, 跳过数)。"""
+    global _data_version
+    _data_version += 1
     added, skipped = 0, 0
     with _connect() as conn:
         for r in rows:
@@ -181,6 +213,8 @@ def insert_items(rows: list[dict]) -> tuple[int, int]:
 
 def cleanup() -> int:
     """删除 14 天前入库的数据。返回删除行数。"""
+    global _data_version
+    _data_version += 1
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
     with _connect() as conn:
         cur = conn.execute("DELETE FROM news_items WHERE fetched_at < ?", (cutoff,))
@@ -228,13 +262,21 @@ def get_hot(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple
 
 
 def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4, profile: dict | None = None) -> tuple[list[dict], int]:
-    """故事级热榜：同一事件多源合并为一席（app/stories.py 聚类）。
+    """故事级热榜（带进程内缓存：入库/清理/屏蔽/画像变化自动失效）。"""
+    pkey = json.dumps(profile, sort_keys=True, ensure_ascii=False) if profile else ""
+    bsig = ";".join(sorted(f"{b['kind']}:{b['value']}" for b in list_blocks()))
+    key = (pkey, bsig, _data_version, max_per_source)
+    if _hot_cache["key"] != key:
+        _hot_cache["ranked"] = _compute_ranked_stories(profile, max_per_source)
+        _hot_cache["key"] = key
+    ranked = _hot_cache["ranked"]
+    total = len(ranked)
+    start = (max(1, page) - 1) * per_page
+    return ranked[start:start + per_page], total
 
-    - 故事热度 = 成员最高 hot_score × (1 + 15%/额外来源)（v0.3.5）
-    - 每来源（按代表条目来源计）最多 max_per_source 个故事
-    - profile（v0.3.9）：兴趣画像——命中的故事加分、不感兴趣的过滤（app/profile.py）
-    - 返回 (代表条目列表[带 _story 元数据], 故事总数)
-    """
+
+def _compute_ranked_stories(profile: dict | None, max_per_source: int = 4) -> list[dict]:
+    """全量计算配额后的故事排行（聚类/画像/过滤/配额），供缓存层调用。"""
     from .profile import apply_profile_to_stories
     from .stories import group_stories, story_score
 
@@ -250,7 +292,6 @@ def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4, 
     _, _, cats = _blocked_sets()
     if cats:
         stories = [s for s in stories if classify(s["representative"]["title"]) not in cats]
-
     ranked: list[dict] = []
     per_source: dict[str, int] = {}
     for st in stories:
@@ -269,9 +310,32 @@ def get_hot_stories(page: int = 1, per_page: int = 20, max_per_source: int = 4, 
             ],
         }
         ranked.append(rep)
-    total = len(ranked)
-    start = (max(1, page) - 1) * per_page
-    return ranked[start:start + per_page], total
+    return ranked
+
+
+def search_items(q: str, limit: int = 50) -> list[dict]:
+    """全文搜索（标题/来源/RSS 摘要，FTS5 短语+前缀匹配）。输入做转义，FTS 语法字符不炸。"""
+    q = (q or "").strip()
+    if not q:
+        return []
+    safe = '"' + q.replace('"', '""') + '"*'
+    try:
+        with _connect() as conn:
+            rids = [r[0] for r in conn.execute(
+                "SELECT n.rowid FROM news_items n JOIN news_items_fts f ON n.rowid = f.rowid"
+                " WHERE news_items_fts MATCH ? LIMIT ?",
+                (safe, limit),
+            ).fetchall()]
+    except sqlite3.OperationalError:
+        return []
+    if not rids:
+        return []
+    marks = ",".join("?" * len(rids))
+    with _connect() as conn:
+        rows = conn.execute(f"SELECT * FROM news_items WHERE rowid IN ({marks})", rids).fetchall()
+    items = [_row_to_dict(r) for r in rows]
+    items.sort(key=lambda x: x["hot_score"], reverse=True)
+    return items
 
 
 def get_timeline(page: int = 1, per_page: int = 20) -> tuple[list[dict], int]:

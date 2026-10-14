@@ -1,0 +1,16 @@
+{% extends "_base.html" %}
+{% block title %}搜索 · AI 资讯聚合{% endblock %}
+{% block nav_active %}search{% endblock %}
+{% block content %}
+<h1>搜索</h1>
+<form action="/search" method="get" style="display:flex;gap:8px;margin:0 0 6px;max-width:560px">
+  <input type="text" name="q" value="{{ q }}" placeholder="搜标题 / 来源 / 摘要…" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:14px">
+  <button class="icon-btn" type="submit">搜索</button>
+</form>
+<p class="hint">{% if q %}「{{ q }}」命中 {{ items|length }} 条（近 14 天，按热度排序）{% else %}输入关键词搜索库内全部条目（标题 / 来源 / RSS 摘要）{% endif %}</p>
+{% if items %}
+  {% for it in items %}{% include "_item.html" %}{% endfor %}
+{% elif q %}
+  <div class="empty">没有命中。试试更短的关键词（如产品名、公司名）。</div>
+{% endif %}
+{% endblock %}

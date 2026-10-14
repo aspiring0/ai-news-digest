@@ -1,5 +1,24 @@
 # 更新日志
 
+## v0.4.1（2026-10-13）
+
+多种安装方式 + 全文搜索 + 热榜缓存
+
+- **三种安装方式**：① Releases 下载单文件可执行（PyInstaller 打包，
+  Windows/macOS/Linux 由 CI 自动构建附到 Release，免 Python，双击即用，
+  数据落在同目录 data/）② pip 安装（`pipx install git+…` 后 `ai-news`
+  命令，pyproject [project.scripts]）③ 源码一键脚本（原有方式）
+- 新增 app/launcher.py（启动即自动开浏览器；打包环境自动修正 DB_PATH
+  到 exe 旁）与 run_app.py 打包入口；本地实测 Windows exe（33MB）独立
+  运行通过（自动抓取、health 正常）
+- CI 新增 release.yml：推 v* tag 自动三平台打包并附到 GitHub Release
+- **全文搜索**：SQLite FTS5（标题/来源/RSS 摘要），触发器同步 + 存量
+  库回填；顶栏搜索框 + /search 结果页（按热度排序）；输入自动转义
+  防 FTS 语法炸
+- **热榜缓存**：故事排行进程内缓存（画像/屏蔽/数据版本为键），入库/
+  清理/屏蔽变化自动失效——14 天满载与并发下不再每次重算聚类
+- 测试 +6（FTS 中英文/回填/转义/搜索页/缓存失效与命中）
+
 ## v0.4.0（2026-10-13）
 
 开源发布收尾

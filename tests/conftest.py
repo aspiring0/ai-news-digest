@@ -92,4 +92,5 @@ def clean_db():
         conn.execute("DELETE FROM provider_settings")
         conn.execute("DELETE FROM blocks")
         conn.execute("DELETE FROM custom_sources")
+    db._hot_cache["key"] = None  # 跨测试缓存隔离
     return db

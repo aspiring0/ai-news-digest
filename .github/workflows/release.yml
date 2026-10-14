@@ -1,0 +1,41 @@
+name: Release Build
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt pyinstaller
+      - name: 打包单文件可执行
+        shell: bash
+        run: |
+          SEP=":"
+          if [ "$RUNNER_OS" = "Windows" ]; then SEP=";"; fi
+          pyinstaller --onefile --name ai-news --clean \
+            --add-data "templates${SEP}templates" \
+            run_app.py
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-news-${{ runner.os }}
+          path: dist/*
+      - name: 附到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

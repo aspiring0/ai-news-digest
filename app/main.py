@@ -276,6 +276,14 @@ def api_distill_profile():
 
 # ---------------- 设置页：provider 管理 ----------------
 
+@app.get("/search")
+def search_page(request: Request, q: str = ""):
+    """全文搜索（标题/来源/RSS 摘要）。"""
+    items = db.search_items(q) if (q or "").strip() else []
+    items = _mark_bookmarks(items)
+    return templates.TemplateResponse(request, "search.html", {"items": items, "q": q})
+
+
 @app.get("/settings")
 def settings_page(request: Request):
     return templates.TemplateResponse(

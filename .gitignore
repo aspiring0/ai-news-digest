@@ -6,3 +6,7 @@ data/
 *.db
 *.db-journal
 .DS_Store
+build/
+dist/
+*.spec
+.exe_test/

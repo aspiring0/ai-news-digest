@@ -9,6 +9,9 @@
       <a href="/bookmarks" class="{{ 'active' if active == 'bookmarks' else '' }}">收藏</a>
     </nav>
     <span class="header-actions">
+      <form action="/search" method="get" style="display:flex">
+        <input type="text" name="q" placeholder="🔍 搜索" class="nav-search" aria-label="搜索">
+      </form>
       <button class="icon-btn" data-open-settings title="模型平台设置">⚙ 设置</button>
       <button class="icon-btn" id="theme-toggle" title="切换深色 / 浅色" aria-label="切换深色 / 浅色">🌙</button>
     </span>
