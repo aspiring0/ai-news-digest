@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import classifier, db, profile as profile_mod, providers, scheduler, summarizer
+from . import agent as agent_mod, classifier, db, profile as profile_mod, providers, scheduler, summarizer
 from .fetch_all import run_once
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -522,3 +522,28 @@ def api_health():
         "news_count": total,
         "last_fetch": db.get_meta("last_fetch_run"),
     }
+
+
+# ---------------- v0.5：Agent 对话 ----------------
+
+@app.post("/api/chat")
+def api_chat(payload: dict):
+    """Agent 对话：接收用户消息，跑 Agent 循环，返回回复。"""
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
+    session_id = (payload.get("session_id") or "").strip() or None
+    result = agent_mod.run_agent(session_id, message)
+    status = 200 if result.get("ok") else (400 if "设置" in result.get("message", "") or "引擎" in result.get("message", "") else 502)
+    return JSONResponse(result, status_code=status)
+
+
+@app.get("/api/chat/history")
+def api_chat_history(session_id: str = ""):
+    return {"ok": True, "messages": agent_mod.get_history(session_id)}
+
+
+@app.delete("/api/chat")
+def api_chat_clear(session_id: str = ""):
+    agent_mod.clear_session(session_id)
+    return {"ok": True}
