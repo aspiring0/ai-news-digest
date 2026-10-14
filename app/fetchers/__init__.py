@@ -10,6 +10,7 @@ from . import (
     ithome,
     marktechpost,
     openai_news,
+    ossinsight,
     producthunt,
     qbitai,
     rundown,
@@ -46,6 +47,7 @@ FETCHERS = [
     tessl,
     github_releases,
     marktechpost,
+    ossinsight,
 ]
 
 __all__ = ["FETCHERS"]
