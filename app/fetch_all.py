@@ -79,6 +79,14 @@ def run_once() -> dict:
     summary["_total"] = {"added": added, "skipped": skipped, "cleaned": deleted}
     logger.info("入库：新增 %d，跳过 %d，清理 14 天前 %d", added, skipped, deleted)
     _notify_push()
+
+    # v0.5：抓取后批量翻译英文标题为中文（失败不阻塞）
+    try:
+        from .translator import translate_untranslated
+        translate_untranslated()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("批量翻译失败（下轮重试）: %s", e)
+
     return summary
 
 

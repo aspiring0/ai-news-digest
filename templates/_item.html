@@ -4,10 +4,16 @@
     {% if rank is defined %}<span class="rank {{ 'r%d'|format(rank) if rank <= 3 else 'dim' }}" title="第 {{ rank }} 名">{{ '%02d'|format(rank) }}</span>{% endif %}
     {% if it.hot_score is defined %}<span class="score" title="{{ '故事热度（多源加成后）' if it._story is defined and it._story.count > 1 else '衰减热度分' }}">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
     {% if it._story is defined and it._story.count > 1 %}<span class="story-badge" title="{{ it._story.sources|join(' / ') }}">⧉ {{ it._story.count }} 源报道</span>{% endif %}
-    <a class="title" href="{{ it.url if it.url.startswith('http') else '#' }}" target="_blank" rel="noopener">{{ it.title }}</a>
+    <a class="title" href="{{ it.url if it.url.startswith('http') else '#' }}" target="_blank" rel="noopener">{{ it.title_cn or it.title }}</a>
     <span class="spacer"></span>
     <button class="star" title="收藏/取消" onclick='toggleBookmark({{ it.url|tojson }}, this)'>{{ "⭐" if it.bookmarked else "☆" }}</button>
   </div>
+  {% if it.title_cn and it.title != it.title_cn %}
+  <div class="row-orig" style="margin-top:2px;padding-left:46px;font-size:11px;color:var(--muted);opacity:.7;overflow-wrap:anywhere">{{ it.title }}</div>
+  {% endif %}
+  {% if it.description_cn %}
+  <div class="row-desc" style="margin-top:2px;padding-left:46px;font-size:12px;color:var(--muted);overflow-wrap:anywhere">{{ it.description_cn }}</div>
+  {% endif %}
   <div class="row-sub">
     <button class="sum-btn" onclick='openSummary({{ it.url|tojson }}, {{ it.title|tojson }})'>点开汇总 →</button>
     <button class="block-btn" title="不感兴趣：屏蔽此条（热榜为整条故事）">✕</button>

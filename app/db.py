@@ -45,6 +45,11 @@ def init_db() -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(news_items)")}
         if "summary" not in cols:
             conn.execute("ALTER TABLE news_items ADD COLUMN summary TEXT")
+        # v0.5：中文标题/描述（LLM 批量翻译，存量库补列）
+        if "title_cn" not in cols:
+            conn.execute("ALTER TABLE news_items ADD COLUMN title_cn TEXT")
+        if "description_cn" not in cols:
+            conn.execute("ALTER TABLE news_items ADD COLUMN description_cn TEXT")
         # v0.3：键值 meta 表（健康检查记录上次抓取时间等）
         conn.execute(
             """
@@ -225,14 +230,17 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     published = _parse(row["published_at"])
     fetched = _parse(row["fetched_at"]) or datetime.now(timezone.utc)
     score = float(row["score"])
+    keys = row.keys()
     return {
         "url": row["url"],
         "title": row["title"],
+        "title_cn": row["title_cn"] if "title_cn" in keys else None,
+        "description_cn": row["description_cn"] if "description_cn" in keys else None,
         "source_name": row["source_name"],
         "published_at": published,
         "fetched_at": fetched,
         "score": score,
-        "summary": row["summary"] if "summary" in row.keys() else None,
+        "summary": row["summary"] if "summary" in keys else None,
         "hot_score": round(hot_score(score, published, fetched), 2),
     }
 
