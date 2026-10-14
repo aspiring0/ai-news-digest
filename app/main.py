@@ -14,8 +14,9 @@ from fastapi.templating import Jinja2Templates
 
 from . import agent as agent_mod, classifier, db, profile as profile_mod, providers, scheduler, summarizer
 from .fetch_all import run_once
+from .logutil import setup_logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+setup_logging()
 logger = logging.getLogger("ai-news-oss")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -572,3 +573,12 @@ def api_chat_history(session_id: str = ""):
 def api_chat_clear(session_id: str = ""):
     agent_mod.clear_session(session_id)
     return {"ok": True}
+
+
+@app.get("/api/logs")
+def api_logs(lines: int = 100, level: str = ""):
+    """查看最近日志（文件持久化，重启不丢）。可按级别过滤。"""
+    from .logutil import read_recent_logs
+
+    lines = max(1, min(lines, 500))
+    return {"ok": True, "lines": read_recent_logs(lines, level)}

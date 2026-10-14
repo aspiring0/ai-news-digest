@@ -1,6 +1,6 @@
 /* 极简 Service Worker：网络优先，离线时回退缓存/离线页（不缓存动态内容，避免读到旧数据） */
 const CACHE = "ai-news-shell-v1";
-const PRECACHE = ["/offline.html", "/manifest.json", "/static/icons/icon-192.png"];
+const PRECACHE = ["/static/offline.html", "/manifest.json", "/static/icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -23,7 +23,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(e.request).catch(() =>
       caches.match(e.request).then(
-        (hit) => hit || (e.request.mode === "navigate" ? caches.match("/offline.html") : Response.error())
+        (hit) => hit || (e.request.mode === "navigate" ? caches.match("/static/offline.html") : Response.error())
       )
     )
   );
