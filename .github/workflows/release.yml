@@ -29,6 +29,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then SEP=";"; fi
           pyinstaller --onefile --name ai-news --clean \
             --add-data "templates${SEP}templates" \
+            --add-data "static${SEP}static" \
             run_app.py
       - name: 上传构建产物
         uses: actions/upload-artifact@v4

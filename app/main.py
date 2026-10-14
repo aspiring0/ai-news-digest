@@ -19,6 +19,7 @@ logger = logging.getLogger("ai-news-oss")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "..", "templates"))
+STATIC_DIR = os.path.join(BASE_DIR, "..", "static")
 
 PER_PAGE = 20
 LOCAL_TZ = ZoneInfo(os.environ.get("TZ", "Asia/Shanghai"))
@@ -49,6 +50,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI 资讯聚合（开源版）", lifespan=lifespan)
+
+# ---- PWA 静态资源（manifest/sw/icons） ----
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/manifest.json", include_in_schema=False)
+def manifest():
+    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"), media_type="application/manifest+json")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(os.path.join(STATIC_DIR, "sw.js"), media_type="application/javascript")
 
 
 @app.get("/", include_in_schema=False)
@@ -272,6 +290,48 @@ def api_distill_profile():
     if not result.get("ok"):
         return JSONResponse(result, status_code=400)
     return result
+
+
+# ---------------- v0.4.2：推送通知 ----------------
+
+@app.get("/api/push")
+def api_get_push():
+    from . import push as push_mod
+
+    cfg = push_mod.get_config()
+    # 凭据打码返回（与 provider key 同级别保密）
+    masked = dict(cfg)
+    for k in ("telegram_token", "wecom_key"):
+        if masked.get(k):
+            masked[k] = masked[k][:4] + "****"
+    return {"ok": True, "config": masked}
+
+
+@app.post("/api/push")
+def api_save_push(payload: dict):
+    from . import push as push_mod
+
+    old = push_mod.get_config()
+    data = dict(payload)
+    # 打码值不覆盖已存凭据
+    for k in ("telegram_token", "wecom_key"):
+        if data.get(k) and "****" in str(data[k]):
+            data[k] = old.get(k, "")
+    try:
+        saved = push_mod.save_config(data)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
+    return {"ok": True, "config": {k: v for k, v in saved.items() if k not in ("telegram_token", "wecom_key")}}
+
+
+@app.post("/api/push/test")
+def api_test_push():
+    from . import push as push_mod
+
+    cfg = push_mod.get_config()
+    if cfg.get("channel") == "off":
+        return JSONResponse({"ok": False, "message": "先选择渠道并保存"}, status_code=400)
+    return push_mod.send(push_mod.build_digest(cfg), cfg)
 
 
 # ---------------- 设置页：provider 管理 ----------------

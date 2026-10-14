@@ -1,5 +1,20 @@
 # 更新日志
 
+## v0.4.2（2026-10-13）
+
+PWA / 推送通知 / 英文 README
+
+- **PWA**：manifest + Service Worker + 自生成三尺寸图标，浏览器
+  "安装到桌面/主屏"可用；离线时回退静态提示页（API 永远走网络，
+  不会读到旧数据）
+- **推送通知**（默认关闭）：每轮抓取后自动推送热榜 top N——支持
+  Telegram Bot / 企业微信群机器人 / 飞书自定义机器人 / 通用 Webhook
+  四种渠道；设置抽屉新面板（渠道切换 / 凭据打码显示 / 发送测试按钮）；
+  API：GET/POST /api/push + POST /api/push/test；凭据存本机 meta 表
+  与 provider key 同等保密
+- **英文 README**（README_EN.md）+ 中文首行互链
+- CI release.yml 补 static/ 目录入 PyInstaller 打包
+
 ## v0.4.1（2026-10-13）
 
 多种安装方式 + 全文搜索 + 热榜缓存

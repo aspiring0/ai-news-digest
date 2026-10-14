@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}AI 资讯聚合{% endblock %}</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1c1917">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <script>
 /* 主题早置：避免深色模式闪白（localStorage > 系统偏好） */
 (function () {
@@ -548,6 +552,13 @@ function markRead(url) {
       document.body.appendChild(panel);
     });
   }).catch(function () { btn.textContent = "源 ?"; });
+})();
+
+/* ---------- PWA：注册 Service Worker（https/localhost 下生效） ---------- */
+(function () {
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  }
 })();
 </script>
 </body>

@@ -40,9 +40,13 @@ if (window.self !== window.top) { document.documentElement.classList.add("in-dra
                   margin-bottom: 12px; }
   details.panel > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 14px;
                             list-style: none; }
+  .push-f{ display:none }
+  .push-f.on{ display:flex }
   details.panel > summary::before { content: "▸ "; color: var(--muted); }
   details.panel[open] > summary::before { content: "▾ "; }
   details.panel .panel-body { padding: 0 12px 12px; }
+  .push-f{ display:none }
+  .push-f.on{ display:flex }
 </style>
 <h1>模型平台</h1>
 <p class="hint">摘要功能调用你自己的模型 key。key 只存在本机 SQLite，<b>不要</b>把数据库文件发给别人。</p>
@@ -162,6 +166,40 @@ if (window.self !== window.top) { document.documentElement.classList.add("in-dra
       <div class="row"><label>手动编辑</label><span class="host-hint">JSON：{"likes": […], "dislikes": […]}</span></div>
       <textarea id="pf-json" style="width:100%;min-height:84px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);padding:6px 8px" placeholder='{"likes": ["具身智能"], "dislikes": ["融资八卦"]}'></textarea>
       <div class="row"><button class="btn" onclick="saveProfileJson()">保存画像</button></div>
+    </div>
+  </div>
+</details>
+
+<details class="panel" open>
+  <summary>推送通知（每轮抓取后自动推送到手机/群，默认关）</summary>
+  <div class="panel-body">
+    <div class="card">
+      <div class="row">
+        <label>启用</label>
+        <input type="checkbox" id="push-enabled" style="width:16px;height:16px;flex:none">
+        <label style="width:auto">每轮抓取后自动推送热榜 top N</label>
+      </div>
+      <div class="row"><label>渠道</label>
+        <select id="push-channel">
+          <option value="off">关闭</option>
+          <option value="telegram">Telegram Bot</option>
+          <option value="wecom">企业微信群机器人</option>
+          <option value="feishu">飞书自定义机器人</option>
+          <option value="webhook">通用 Webhook（POST JSON）</option>
+        </select>
+      </div>
+      <div class="row push-f push-telegram"><label>Bot Token</label><input type="text" id="push-tg-token" placeholder="找 @BotFather 创建 Bot 获取"></div>
+      <div class="row push-f push-telegram"><label>Chat ID</label><input type="text" id="push-tg-chat" placeholder="你的用户/群 ID"></div>
+      <div class="row push-f push-wecom"><label>机器人 Key</label><input type="text" id="push-wecom-key" placeholder="群设置 → 添加机器人 → 复制 Key"></div>
+      <div class="row push-f push-feishu"><label>Webhook 地址</label><input type="text" id="push-feishu-url" placeholder="飞书群 → 设置 → 群机器人 → 自定义"></div>
+      <div class="row push-f push-webhook"><label>Webhook 地址</label><input type="text" id="push-webhook-url" placeholder="https://你的接收端点"></div>
+      <div class="row"><label>推送条数</label><input type="text" id="push-top-n" value="5" style="max-width:60px"> <span class="host-hint">1-10 条</span></div>
+      <div class="row"><label>详情链接</label><input type="text" id="push-base-url" value="http://localhost:8000/hot" placeholder="推送底部的详情链接"></div>
+      <div class="row">
+        <button class="btn primary" onclick="savePush()">保存配置</button>
+        <button class="btn" onclick="testPush()">发送测试</button>
+      </div>
+      <div class="msg" id="msg-push"></div>
     </div>
   </div>
 </details>
@@ -323,6 +361,7 @@ function escH(s) {
 }
 loadCustomSources();
 loadBlocks();
+loadPushUI();
 /* ---------- 兴趣画像 ---------- */
 async function loadProfileUI() {
   const r = await fetch("/api/profile");
@@ -373,5 +412,58 @@ async function saveProfileJson() {
   else { msg.textContent = d.message || "保存失败"; msg.className = "msg err"; }
 }
 loadProfileUI();
+
+/* ---------- 推送通知 ---------- */
+const PUSH_FIELDS = {telegram: ["push-tg-token", "push-tg-chat"], wecom: ["push-wecom-key"],
+                     feishu: ["push-feishu-url"], webhook: ["push-webhook-url"]};
+function pushChannelUI() {
+  const ch = document.getElementById("push-channel").value;
+  document.querySelectorAll(".push-f").forEach(el => el.classList.remove("on"));
+  if (PUSH_FIELDS[ch]) document.querySelectorAll(".push-" + ch).forEach(el => el.classList.add("on"));
+}
+document.getElementById("push-channel").addEventListener("change", pushChannelUI);
+async function loadPushUI() {
+  const r = await fetch("/api/push");
+  const d = await r.json();
+  const c = d.config || {};
+  document.getElementById("push-enabled").checked = !!c.enabled;
+  document.getElementById("push-channel").value = c.channel || "off";
+  if (c.telegram_token) document.getElementById("push-tg-token").value = c.telegram_token;
+  if (c.telegram_chat) document.getElementById("push-tg-chat").value = c.telegram_chat;
+  if (c.wecom_key) document.getElementById("push-wecom-key").value = c.wecom_key;
+  if (c.feishu_url) document.getElementById("push-feishu-url").value = c.feishu_url;
+  if (c.webhook_url) document.getElementById("push-webhook-url").value = c.webhook_url;
+  if (c.top_n) document.getElementById("push-top-n").value = c.top_n;
+  if (c.base_url) document.getElementById("push-base-url").value = c.base_url;
+  pushChannelUI();
+}
+async function savePush() {
+  const msg = document.getElementById("msg-push");
+  const body = {
+    enabled: document.getElementById("push-enabled").checked,
+    channel: document.getElementById("push-channel").value,
+    telegram_token: document.getElementById("push-tg-token").value.trim(),
+    telegram_chat: document.getElementById("push-tg-chat").value.trim(),
+    wecom_key: document.getElementById("push-wecom-key").value.trim(),
+    feishu_url: document.getElementById("push-feishu-url").value.trim(),
+    webhook_url: document.getElementById("push-webhook-url").value.trim(),
+    top_n: parseInt(document.getElementById("push-top-n").value) || 5,
+    base_url: document.getElementById("push-base-url").value.trim(),
+  };
+  const r = await fetch("/api/push", {method: "POST", headers: {"Content-Type": "application/json"},
+                                        body: JSON.stringify(body)});
+  const d = await r.json();
+  msg.textContent = d.ok ? "已保存" : (d.message || "保存失败");
+  msg.className = "msg " + (d.ok ? "ok" : "err");
+}
+async function testPush() {
+  const msg = document.getElementById("msg-push");
+  msg.textContent = "发送中…"; msg.className = "msg ok";
+  const r = await fetch("/api/push/test", {method: "POST"});
+  const d = await r.json();
+  msg.textContent = d.ok ? "✓ 已发送，去对应渠道看看" : (d.message || "失败");
+  msg.className = "msg " + (d.ok ? "ok" : "err");
+}
+loadPushUI();
 </script>
 {% endblock %}

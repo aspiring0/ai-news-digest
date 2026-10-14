@@ -1,0 +1,16 @@
+{
+  "name": "AI 资讯聚合",
+  "short_name": "AI 资讯",
+  "description": "自托管 AI 资讯聚合站：19 源抓取、故事合并热榜、AI 摘要、兴趣画像",
+  "start_url": "/hot",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#1c1917",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

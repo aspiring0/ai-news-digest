@@ -78,4 +78,15 @@ def run_once() -> dict:
     )
     summary["_total"] = {"added": added, "skipped": skipped, "cleaned": deleted}
     logger.info("入库：新增 %d，跳过 %d，清理 14 天前 %d", added, skipped, deleted)
+    _notify_push()
     return summary
+
+
+def _notify_push() -> None:
+    """每轮抓取后推送热榜摘要（未启用则跳过；失败不影响抓取）。"""
+    try:
+        from .push import notify_round
+
+        notify_round()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("推送通知失败: %s", e)
