@@ -528,7 +528,7 @@ def api_health():
 
 @app.post("/api/chat")
 def api_chat(payload: dict):
-    """Agent 对话：接收用户消息，跑 Agent 循环，返回回复。"""
+    """Agent 对话（非流式，测试兼容）。"""
     message = (payload.get("message") or "").strip()
     if not message:
         return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
@@ -536,6 +536,31 @@ def api_chat(payload: dict):
     result = agent_mod.run_agent(session_id, message)
     status = 200 if result.get("ok") else (400 if "设置" in result.get("message", "") or "引擎" in result.get("message", "") else 502)
     return JSONResponse(result, status_code=status)
+
+
+@app.post("/api/chat/stream")
+async def api_chat_stream(payload: dict):
+    """Agent 对话（SSE 流式）：工具调用过程实时推送。"""
+    import asyncio
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
+    session_id = (payload.get("session_id") or "").strip() or None
+    page_context = payload.get("page_context") or []
+
+    async def generate():
+        loop = asyncio.get_event_loop()
+        for event in agent_mod.run_agent_stream(session_id, message, page_context):
+            data = _json.dumps(event, ensure_ascii=False)
+            yield f"data: {data}\n\n"
+            await asyncio.sleep(0)
+
+    return StreamingResponse(generate(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/chat/history")

@@ -164,11 +164,12 @@ class TestWriteConfirmation:
         monkeypatch.setattr(summarizer, "fetch_article_text", lambda url, rss_summary="": "模拟正文快照")
 
     def test_write_action_flagged_in_response(self, clean_db, monkeypatch):
-        """Agent 调写工具时，结果应标记 pending_confirmation。"""
+        """写操作确认流：第一步返回确认请求，用户说'是'后执行。"""
         db.insert_items([_row("https://w/1", "要收藏的文章 Keplr Nova", "S")])
         self._mock_provider(monkeypatch)
         self._mock_bookmark_summarizer(monkeypatch)
-        # 模拟 LLM 要调 bookmark_item
+
+        # 第一步：LLM 想要 bookmark → Agent 应返回确认请求（不执行）
         import app.agent as agent_mod
         call_count = {"n": 0}
 
@@ -183,10 +184,15 @@ class TestWriteConfirmation:
         monkeypatch.setattr(agent_mod, "_call_llm", fake_call)
         from app.agent import run_agent
         result = run_agent("session5", "帮我收藏那条")
-        assert result["ok"] is True
-        # 确认收藏确实执行了
+
+        # 应返回确认请求（不是最终结果）
+        assert "确认" in result["reply"] or "收藏" in result["reply"]
+
+        # 第二步：用户说"是" → 执行
+        result2 = run_agent("session5", "是")
+        assert result2["ok"] is True
         bm = db.get_bookmarks()
-        assert any(b["url"] == "https://w/1" for b in bm)
+        assert any(b["url"] == "https://w/1" for b in bm), "确认后应执行收藏"
 
 
 # ══════════════════════════════════════════════════════════

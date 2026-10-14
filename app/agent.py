@@ -1,13 +1,18 @@
-"""平台操控 Agent：用自然语言操控资讯台（搜索/收藏/屏蔽/加源）。
+"""平台操控 Agent v2：流式输出 + 写操作确认 + 页面上下文 + URL 编号。
 
 架构：OpenAI function calling 原生循环（无框架依赖）。
-LLM 不执行工具——它返回 tool_calls，本模块执行后将结果喂回，
-直到 LLM 给出最终文本回答或触发护栏。
+增强：
+- SSE 流式：工具调用过程实时推送，不等全部完成
+- 确认流：写操作（收藏/屏蔽/加源）先推 confirm 事件给用户，
+  用户说"是"后才执行
+- 页面上下文：前端传入当前页可见条目，Agent 能理解"这条""第 3 条"
+- URL 编号：工具返回编号列表，提示词强制 LLM 用原文 URL
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 
@@ -23,72 +28,73 @@ TIMEOUT_SECONDS = 60
 TOOL_RESULT_MAX_CHARS = 2000
 HISTORY_MAX_ROUNDS = 10
 
-# 会话存储（in-memory，重启清空）
-_sessions: dict[str, list[dict]] = {}
+# 写操作工具（需要用户确认）
+WRITE_TOOLS = {"bookmark_item", "block_item", "block_source", "block_category", "add_rss_source"}
+
+# 会话存储：{session_id: {"messages": [...], "pending_action": {...}}}
+_sessions: dict[str, dict] = {}
 
 AGENT_SYSTEM_PROMPT = (
-    "你是「AI 资讯助手」，帮用户操控他们的 AI 资讯聚合站。\n"
-    "你可以搜索新闻、查看热榜、收藏/屏蔽条目、添加 RSS 源。\n"
-    "规则：\n"
+    "你是「AI 资讯助手」，帮用户操控他们的 AI 资讯聚合站。\n\n"
+    "## 规则\n"
     "1. 用简体中文回答\n"
-    "2. 涉及写操作（收藏/屏蔽/加源）时，先告知用户你要做什么再执行\n"
-    "3. 回答时引用来源（标题+来源名）\n"
-    "4. 如果搜索无结果，建议用户换关键词或等下一轮抓取\n"
-    "5. 库内数据只保留 14 天，更早的内容无法查到"
+    "2. **写操作（收藏/屏蔽/加源）**：直接调用工具即可，系统会自动处理确认流程\n"
+    "3. 回答时引用来源（标题+来源名），格式：[标题](来源名)\n"
+    "4. 如果搜索无结果，建议换关键词或等下一轮抓取\n"
+    "5. 库内数据只保留 14 天\n\n"
+    "## 重要：URL 精确性\n"
+    "搜索/热榜工具返回的每条都有编号和完整 URL。当你需要用 URL 调用其他工具时，"
+    "必须使用工具返回的完整 URL 原文，不要猜测或截断。\n\n"
+    "## 页面上下文\n"
+    "用户消息前可能有 [当前页面] 标注，列出了用户正在看的条目。"
+    '当用户说「这条」「第 N 条」时，参照该列表确定具体是哪条。'
 )
 
 
 # ══════════════════════════════════════════════════════════
-# 工具层（每个工具 = 一个函数 + 一个 JSON schema）
+# 工具层
 # ══════════════════════════════════════════════════════════
 
 def tool_search_news(query: str) -> list[dict]:
-    """FTS5 全文搜索（标题+中文标题+描述+RSS 摘要）。"""
     items = db.search_items(query, limit=10)
-    return [{"title": it.get("title_cn") or it["title"],
+    return [{"n": i + 1, "title": it.get("title_cn") or it["title"],
              "url": it["url"], "source": it["source_name"],
-             "hot_score": it["hot_score"]} for it in items]
+             "hot_score": it["hot_score"]} for i, it in enumerate(items)]
 
 
 def tool_get_trending(limit: int = 5) -> list[dict]:
-    """当前热榜 top N（故事级）。"""
     items, _ = db.get_hot_stories(per_page=max(1, min(10, limit)))
-    return [{"title": it.get("title_cn") or it["title"],
+    return [{"n": i + 1, "title": it.get("title_cn") or it["title"],
              "url": it["url"], "source": it["source_name"],
              "hot_score": it["hot_score"],
-             "story_count": (it.get("_story") or {}).get("count", 1)} for it in items]
+             "story_count": (it.get("_story") or {}).get("count", 1)}
+            for i, it in enumerate(items)]
 
 
 def tool_bookmark_item(url: str) -> dict:
-    """收藏/取消收藏一条新闻。"""
     try:
         state = db.toggle_bookmark(url)
-        return {"ok": True, "bookmarked": state,
-                "message": "已收藏" if state else "已取消收藏"}
+        return {"ok": True, "bookmarked": state, "message": "已收藏" if state else "已取消收藏"}
     except KeyError:
         return {"ok": False, "message": "找不到这条新闻（可能已过期被清理）"}
 
 
 def tool_block_item(url: str) -> dict:
-    """屏蔽某条新闻（不再出现在热榜/时间线）。"""
     db.add_block("url", url)
     return {"ok": True, "message": "已屏蔽"}
 
 
 def tool_block_source(source_name: str) -> dict:
-    """屏蔽某个来源的所有新闻。"""
     db.add_block("source", source_name)
     return {"ok": True, "message": f"已屏蔽来源「{source_name}」"}
 
 
 def tool_block_category(category: str) -> dict:
-    """屏蔽某个分类的所有新闻。"""
     db.add_block("category", category)
     return {"ok": True, "message": f"已屏蔽分类「{category}」"}
 
 
 def tool_add_rss_source(name: str, url: str) -> dict:
-    """添加自定义 RSS 源。"""
     try:
         db.add_custom_source(name, url)
         return {"ok": True, "message": f"已添加「{name}」，下一轮抓取生效"}
@@ -97,47 +103,41 @@ def tool_add_rss_source(name: str, url: str) -> dict:
 
 
 def tool_get_source_health() -> dict:
-    """各源最近一轮抓取状态。"""
     raw = db.get_meta("source_health")
     return json.loads(raw) if raw else {}
 
 
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
-        "name": "search_news", "description": "搜索新闻（标题+中文标题+描述+RSS摘要）",
+        "name": "search_news", "description": "搜索新闻（标题+中文标题+描述+RSS摘要），返回带编号的结果列表",
         "parameters": {"type": "object", "properties": {
-            "query": {"type": "string", "description": "搜索关键词"}},
-            "required": ["query"]}}},
+            "query": {"type": "string", "description": "搜索关键词"}}, "required": ["query"]}}},
     {"type": "function", "function": {
-        "name": "get_trending", "description": "获取当前热榜 top N",
+        "name": "get_trending", "description": "获取当前热榜 top N，返回带编号的结果列表",
         "parameters": {"type": "object", "properties": {
             "limit": {"type": "integer", "description": "返回条数（1-10）", "default": 5}}}}},
     {"type": "function", "function": {
-        "name": "bookmark_item", "description": "收藏或取消收藏一条新闻",
+        "name": "bookmark_item", "description": "收藏或取消收藏一条新闻（用工具返回的完整 URL）",
         "parameters": {"type": "object", "properties": {
-            "url": {"type": "string", "description": "新闻的 URL"}},
+            "url": {"type": "string", "description": "新闻的完整 URL（必须与工具返回的完全一致）"}},
             "required": ["url"]}}},
     {"type": "function", "function": {
-        "name": "block_item", "description": "屏蔽某条新闻",
+        "name": "block_item", "description": "屏蔽某条新闻（用工具返回的完整 URL）",
         "parameters": {"type": "object", "properties": {
-            "url": {"type": "string", "description": "要屏蔽的新闻 URL"}},
-            "required": ["url"]}}},
+            "url": {"type": "string", "description": "要屏蔽的新闻 URL"}}, "required": ["url"]}}},
     {"type": "function", "function": {
         "name": "block_source", "description": "屏蔽某个来源的所有新闻",
         "parameters": {"type": "object", "properties": {
-            "source_name": {"type": "string", "description": "来源名称"}},
-            "required": ["source_name"]}}},
+            "source_name": {"type": "string", "description": "来源名称"}}, "required": ["source_name"]}}},
     {"type": "function", "function": {
         "name": "block_category", "description": "屏蔽某个分类的所有新闻",
         "parameters": {"type": "object", "properties": {
-            "category": {"type": "string", "description": "分类名称"}},
-            "required": ["category"]}}},
+            "category": {"type": "string", "description": "分类名称"}}, "required": ["category"]}}},
     {"type": "function", "function": {
         "name": "add_rss_source", "description": "添加自定义 RSS 源",
         "parameters": {"type": "object", "properties": {
             "name": {"type": "string", "description": "源名称"},
-            "url": {"type": "string", "description": "RSS 地址"}},
-            "required": ["name", "url"]}}},
+            "url": {"type": "string", "description": "RSS 地址"}}, "required": ["name", "url"]}}},
     {"type": "function", "function": {
         "name": "get_source_health", "description": "各源最近一轮抓取状态",
         "parameters": {"type": "object", "properties": {}}}},
@@ -154,13 +154,203 @@ TOOL_REGISTRY = {
     "get_source_health": tool_get_source_health,
 }
 
+_TOOL_DESCRIPTIONS = {
+    "bookmark_item": "收藏", "block_item": "屏蔽", "block_source": "屏蔽来源",
+    "block_category": "屏蔽分类", "add_rss_source": "添加 RSS 源",
+}
+
 
 # ══════════════════════════════════════════════════════════
-# LLM 调用（OpenAI function calling 原生格式）
+# 确认流辅助
+# ══════════════════════════════════════════════════════════
+
+_YES_RE = re.compile(r"^(是|是的|确认|好|好的|嗯|OK|ok|Yes|yes|可以|没错|对)\b")
+_NO_RE = re.compile(r"^(不|不要|算了|取消|No|no|别)\b")
+
+
+def _is_affirmative(message: str) -> bool:
+    return bool(_YES_RE.match(message.strip()))
+
+
+def _is_negative(message: str) -> bool:
+    return bool(_NO_RE.match(message.strip()))
+
+
+def _execute_pending(pending: dict) -> dict:
+    """执行待确认的写操作。"""
+    tool_name = pending["tool"]
+    tool_fn = TOOL_REGISTRY.get(tool_name)
+    if not tool_fn:
+        return {"ok": False, "message": f"未知操作: {tool_name}"}
+    try:
+        return tool_fn(**pending["args"])
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "message": f"执行失败: {e}"}
+
+
+# ══════════════════════════════════════════════════════════
+# Agent 主循环（流式生成器）
+# ══════════════════════════════════════════════════════════
+
+def run_agent_stream(session_id: str, user_message: str, page_context: list[dict] | None = None):
+    """流式 Agent：yield SSE 事件字典。
+
+    事件类型：
+    - {"type": "tool", "tool": "...", "args": {...}}          工具调用开始
+    - {"type": "tool_result", "tool": "...", "count": N}       工具返回（条数）
+    - {"type": "confirm", "action": "...", "description": "...", "args": {...}}  请求确认
+    - {"type": "reply", "content": "..."}                      最终回复（一段）
+    - {"type": "sources", "items": [...]}                       引用来源
+    - {"type": "done", "session_id": "..."}                     流结束
+    - {"type": "error", "message": "..."}                       错误
+    """
+    provider = get_default()
+    if not provider:
+        yield {"type": "error", "message": "请先在设置页配置默认解读引擎"}
+        return
+
+    session_id = session_id or str(uuid.uuid4())[:8]
+    session = _sessions.setdefault(session_id, {"messages": [], "pending_action": None})
+    history = session["messages"]
+
+    # 确认流：有 pending_action 且用户说"是" → 执行
+    if session["pending_action"]:
+        pending = session["pending_action"]
+        session["pending_action"] = None
+        if _is_affirmative(user_message):
+            yield {"type": "tool", "tool": pending["tool"], "args": pending["args"]}
+            result = _execute_pending(pending)
+            desc = _TOOL_DESCRIPTIONS.get(pending["tool"], pending["tool"])
+            reply = result.get("message", "操作完成") if result.get("ok") else f"❌ {result.get('message', '失败')}"
+            history.append({"role": "user", "content": user_message})
+            history.append({"role": "assistant", "content": reply})
+            yield {"type": "reply", "content": reply}
+            yield {"type": "done", "session_id": session_id}
+            return
+        elif _is_negative(user_message):
+            history.append({"role": "user", "content": user_message})
+            reply = "好的，已取消。"
+            history.append({"role": "assistant", "content": reply})
+            yield {"type": "reply", "content": reply}
+            yield {"type": "done", "session_id": session_id}
+            return
+        # 既不是确认也不是拒绝 → 当作新消息继续处理
+
+    # 构建用户消息（含页面上下文）
+    user_content = user_message
+    if page_context:
+        ctx_lines = [f"[当前页面] 用户正在看以下条目："]
+        for item in page_context[:10]:
+            ctx_lines.append(f"  {item.get('n', '?')}. {item.get('title', '')} | URL: {item.get('url', '')}")
+        user_content = "\n".join(ctx_lines) + f"\n\n用户说：{user_message}"
+
+    history.append({"role": "user", "content": user_content})
+
+    # 构建消息列表
+    all_messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    all_messages.extend(history[-HISTORY_MAX_ROUNDS * 2:])
+
+    tool_calls_log: list[dict] = []
+    sources_used: list[dict] = []
+    start = time.time()
+
+    try:
+        for _iteration in range(MAX_ITERATIONS):
+            if time.time() - start > TIMEOUT_SECONDS:
+                break
+
+            llm_result = _call_llm(provider, all_messages, TOOL_SCHEMAS)
+
+            if not llm_result["tool_calls"]:
+                reply = llm_result["content"] or "抱歉，我没有得到有效回复。"
+                history.append({"role": "assistant", "content": reply})
+                yield {"type": "reply", "content": reply}
+                if sources_used:
+                    yield {"type": "sources", "items": sources_used[:10]}
+                yield {"type": "done", "session_id": session_id}
+                return
+
+            assistant_msg = {"role": "assistant", "content": llm_result["content"],
+                             "tool_calls": [{"id": tc["id"], "type": "function",
+                                            "function": {"name": tc["name"],
+                                                          "arguments": tc["arguments"]}}
+                                           for tc in llm_result["tool_calls"]]}
+            all_messages.append(assistant_msg)
+
+            for tc in llm_result["tool_calls"]:
+                tool_name = tc["name"]
+                tool_fn = TOOL_REGISTRY.get(tool_name)
+                try:
+                    tool_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                    if "query" in tool_args:
+                        tool_args["query"] = str(tool_args["query"])[:200]
+                except (ValueError, TypeError):
+                    tool_args = {}
+
+                if not tool_fn:
+                    all_messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                         "content": json.dumps({"error": f"未知工具: {tool_name}"})})
+                    continue
+
+                # ── 写操作确认流 ──
+                if tool_name in WRITE_TOOLS:
+                    desc = _TOOL_DESCRIPTIONS.get(tool_name, tool_name)
+                    arg_desc = ", ".join(f"{k}={str(v)[:50]}" for k, v in tool_args.items())
+                    yield {"type": "confirm", "action": tool_name,
+                           "description": f"{desc}（{arg_desc}）",
+                           "args": tool_args}
+                    # 存 pending，本轮不执行，等下一轮用户确认
+                    session["pending_action"] = {"tool": tool_name, "args": tool_args}
+                    # 告诉 LLM 已请求确认
+                    all_messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                         "content": json.dumps({"status": "confirming",
+                                                                 "message": f"已向用户发送确认请求：{desc} {arg_desc}"},
+                                                                ensure_ascii=False)})
+                    history.append({"role": "assistant",
+                                    "content": f"确认要{desc}吗？（{arg_desc}）"})
+                    yield {"type": "reply", "content": f"确认要{desc}吗？（{arg_desc}）"}
+                    yield {"type": "done", "session_id": session_id}
+                    return
+
+                # ── 读操作直接执行 ──
+                yield {"type": "tool", "tool": tool_name, "args": tool_args}
+                try:
+                    result = tool_fn(**tool_args)
+                except Exception as e:  # noqa: BLE001
+                    result = {"error": f"工具执行失败: {e}"}
+
+                result_str = json.dumps(result, ensure_ascii=False, default=str)[:TOOL_RESULT_MAX_CHARS]
+                all_messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
+
+                if isinstance(result, list):
+                    yield {"type": "tool_result", "tool": tool_name, "count": len(result)}
+                    tool_calls_log.append({"tool": tool_name, "args": tool_args, "result_count": len(result)})
+                    for r in result:
+                        if isinstance(r, dict) and "url" in r:
+                            if not any(s["url"] == r["url"] for s in sources_used):
+                                sources_used.append({"title": r.get("title", ""), "url": r["url"],
+                                                     "source": r.get("source", "")})
+                else:
+                    yield {"type": "tool_result", "tool": tool_name}
+                    tool_calls_log.append({"tool": tool_name, "args": tool_args})
+
+        reply = "基于已有信息，我暂时无法得到更完整的答案。请尝试换一个问法。"
+        history.append({"role": "assistant", "content": reply})
+        yield {"type": "reply", "content": reply}
+        yield {"type": "done", "session_id": session_id}
+
+    except requests.Timeout:
+        yield {"type": "error", "message": "模型调用超时，请稍后重试"}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Agent 异常: %s", e)
+        yield {"type": "error", "message": f"Agent 出错: {e}"}
+
+
+# ══════════════════════════════════════════════════════════
+# LLM 调用
 # ══════════════════════════════════════════════════════════
 
 def _call_llm(provider: dict, messages: list[dict], tools: list[dict]) -> dict:
-    """调 LLM 的 /chat/completions，返回 {content, tool_calls} 或抛异常。"""
     resp = requests.post(
         chat_url(provider["id"], provider["base_url"]),
         headers={"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"},
@@ -187,101 +377,37 @@ def _call_llm(provider: dict, messages: list[dict], tools: list[dict]) -> dict:
 
 
 # ══════════════════════════════════════════════════════════
-# Agent 主循环
+# 兼容旧接口（非流式）
 # ══════════════════════════════════════════════════════════
 
 def run_agent(session_id: str, user_message: str) -> dict:
-    """主入口：接收用户消息，跑 Agent 循环，返回最终回复。"""
-    provider = get_default()
-    if not provider:
-        return {"ok": False, "message": "请先在设置页配置默认解读引擎（模型 key）"}
-
-    session_id = session_id or str(uuid.uuid4())[:8]
-    history = _sessions.setdefault(session_id, [])
-    history.append({"role": "user", "content": user_message})
-
-    # 构建消息列表（system + 最近 N 轮历史）
-    all_messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
-    recent = history[-HISTORY_MAX_ROUNDS * 2:]
-    all_messages.extend(recent)
-
-    tool_calls_log: list[dict] = []
-    sources_used: set[dict] = set()
-    start = time.time()
-
-    try:
-        for _iteration in range(MAX_ITERATIONS):
-            if time.time() - start > TIMEOUT_SECONDS:
-                break
-
-            llm_result = _call_llm(provider, all_messages, TOOL_SCHEMAS)
-
-            if not llm_result["tool_calls"]:
-                # 最终回答
-                reply = llm_result["content"] or "抱歉，我没有得到有效回复。"
-                history.append({"role": "assistant", "content": reply})
-                return {"ok": True, "session_id": session_id, "reply": reply,
-                        "tool_calls": tool_calls_log, "sources": list(sources_used)}
-
-            # 有 tool_calls → 执行工具
-            assistant_msg = {"role": "assistant", "content": llm_result["content"],
-                             "tool_calls": [{"id": tc["id"], "type": "function",
-                                            "function": {"name": tc["name"],
-                                                          "arguments": tc["arguments"]}}
-                                           for tc in llm_result["tool_calls"]]}
-            all_messages.append(assistant_msg)
-
-            for tc in llm_result["tool_calls"]:
-                tool_name = tc["name"]
-                tool_fn = TOOL_REGISTRY.get(tool_name)
-                try:
-                    tool_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
-                    # 参数安全：query 限长
-                    if "query" in tool_args:
-                        tool_args["query"] = str(tool_args["query"])[:200]
-                except (ValueError, TypeError):
-                    tool_args = {}
-
-                if tool_fn:
-                    try:
-                        result = tool_fn(**tool_args)
-                    except Exception as e:  # noqa: BLE001
-                        result = {"error": f"工具执行失败: {e}"}
-                else:
-                    result = {"error": f"未知工具: {tool_name}"}
-
-                result_str = json.dumps(result, ensure_ascii=False, default=str)[:TOOL_RESULT_MAX_CHARS]
-                all_messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result_str})
-
-                # 记录工具调用
-                log_entry = {"tool": tool_name, "args": tool_args}
-                if isinstance(result, list):
-                    log_entry["result_count"] = len(result)
-                    for r in result:
-                        if isinstance(r, dict) and "url" in r:
-                            sources_used.add(json.dumps({"title": r.get("title", ""),
-                                                          "url": r["url"],
-                                                          "source": r.get("source", "")},
-                                                         ensure_ascii=False))
-                elif isinstance(result, dict):
-                    log_entry["result"] = {k: v for k, v in result.items() if k != "error"}
-                tool_calls_log.append(log_entry)
-
-        # 超过最大轮次
-        reply = "基于已有信息，我暂时无法得到更完整的答案。请尝试换一个问法，或等下一轮数据更新后再问。"
-        history.append({"role": "assistant", "content": reply})
-        return {"ok": True, "session_id": session_id, "reply": reply,
-                "tool_calls": tool_calls_log, "sources": list(sources_used)}
-
-    except requests.Timeout:
-        return {"ok": False, "message": "模型调用超时，请稍后重试"}
-    except Exception as e:  # noqa: BLE001
-        logger.warning("Agent 异常: %s", e)
-        return {"ok": False, "message": f"Agent 出错: {e}"}
+    """非流式版本（测试兼容）：收集所有事件后组装结果。"""
+    events = list(run_agent_stream(session_id, user_message))
+    reply = ""
+    sources = []
+    tool_calls = []
+    sid = session_id
+    for ev in events:
+        if ev["type"] == "reply":
+            reply = ev["content"]
+        elif ev["type"] == "sources":
+            sources = [json.dumps(s, ensure_ascii=False) for s in ev["items"]]
+        elif ev["type"] == "tool":
+            tool_calls.append({"tool": ev["tool"], "args": ev["args"]})
+        elif ev["type"] == "tool_result":
+            if tool_calls:
+                tool_calls[-1]["result_count"] = ev.get("count", 0)
+        elif ev["type"] == "done":
+            sid = ev["session_id"]
+        elif ev["type"] == "error":
+            return {"ok": False, "message": ev["message"]}
+    return {"ok": True, "session_id": sid, "reply": reply,
+            "tool_calls": tool_calls, "sources": sources}
 
 
 def get_history(session_id: str) -> list[dict]:
-    return _sessions.get(session_id, [])
+    session = _sessions.get(session_id, {})
+    return session.get("messages", [])
 
 
 def clear_session(session_id: str) -> None:
