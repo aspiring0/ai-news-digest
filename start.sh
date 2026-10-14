@@ -34,6 +34,7 @@ else
     echo "      如需修改：cp .env.example .env 后编辑"
 fi
 PORT="${PORT:-8000}"
+HOST="${HOST:-127.0.0.1}"
 # DATA_DIR 是给人看的目录；程序实际读 DB_PATH，这里做一次映射（DB_PATH 显式设置时优先）
 if [ -z "${DB_PATH:-}" ] && [ -n "${DATA_DIR:-}" ]; then
     export DB_PATH="$DATA_DIR/news.db"
@@ -63,7 +64,7 @@ fi
 if [ "$config_ok" -ne 1 ]; then
     exit 1
 fi
-echo "[3/5] 配置校验通过（端口 $PORT、数据目录 $DATA_DIR、抓取间隔 ${FETCH_INTERVAL_HOURS}h）"
+echo "[3/5] 配置校验通过（监听 ${HOST}:${PORT}、数据目录 $DATA_DIR、抓取间隔 ${FETCH_INTERVAL_HOURS}h）"
 
 # ---------- 4. 虚拟环境 + 依赖 ----------
 if [ ! -d .venv ]; then
@@ -97,4 +98,4 @@ echo "  设置：  http://localhost:${PORT}/settings  （摘要功能需先在�
 echo ""
 echo "  按 Ctrl+C 停止服务。数据保存在 ./data/news.db，备份拷走就行。"
 echo ""
-exec .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+exec .venv/bin/python -m uvicorn app.main:app --host "$HOST" --port "$PORT"

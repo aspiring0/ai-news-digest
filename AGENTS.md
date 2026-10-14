@@ -45,7 +45,7 @@ curl http://localhost:8000/api/health
 期望返回类似：
 
 ```json
-{"ok": true, "version": "0.3.0", "news_count": 164, "last_fetch": "2026-10-13T07:26:09+00:00"}
+{"ok": true, "version": "0.4.0", "news_count": 164, "last_fetch": "2026-10-13T07:26:09+00:00"}
 ```
 
 - `news_count` 为 0：首次抓取还没完成（约几十秒），等一两分钟再查

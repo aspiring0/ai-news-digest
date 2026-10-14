@@ -36,7 +36,13 @@
     {% if page < total_pages %}<a href="/hot?page={{ page + 1 }}{% if personal %}&personal=1{% endif %}">下一页 →</a>{% endif %}
   </div>
 {% else %}
-  <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>
+  <div class="empty" style="text-align:left;padding:24px 28px;line-height:2">
+    <b>👋 欢迎使用，三步上手：</b><br>
+    ① 现在就等着——首次抓取正在后台进行（约 1 分钟），完成后本页自动有数据；<br>
+    ② 想解锁 <b>AI 摘要</b>：右上角「⚙ 设置」→ 任选一家模型平台（DeepSeek/智谱/Kimi…）填 key 并设为默认；<br>
+    ③ 想订阅自己的源：设置 →「自定义 RSS 源」粘贴地址即可，零代码。<br>
+    <span style="color:var(--muted);font-size:12px">刷新本页查看抓取进度；顶栏「↻ 刷新」可手动触发一轮抓取。</span>
+  </div>
 {% endif %}
 <p class="stats-line">数据每 4 小时自动刷新 · 只保留 14 天</p>
 {% endblock %}

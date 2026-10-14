@@ -42,6 +42,7 @@ if exist .env (
     echo       如需修改：copy .env.example .env 后编辑
 )
 if not defined PORT set "PORT=8000"
+if not defined HOST set "HOST=127.0.0.1"
 rem DATA_DIR 是给人看的目录；程序实际读 DB_PATH，这里做一次映射（DB_PATH 显式设置时优先）
 if not defined DB_PATH (
     if defined DATA_DIR set "DB_PATH=!DATA_DIR!\news.db"
@@ -80,7 +81,7 @@ if errorlevel 1 (
     exit /b 1
 )
 del "%DATA_DIR%\.write_test" 2>nul
-echo [3/5] 配置校验通过（端口 %PORT%、数据目录 %DATA_DIR%、抓取间隔 %FETCH_INTERVAL_HOURS%h）
+echo [3/5] 配置校验通过（监听 %HOST%:%PORT%、数据目录 %DATA_DIR%、抓取间隔 %FETCH_INTERVAL_HOURS%h）
 
 rem ---------- 4. 虚拟环境 + 依赖 ----------
 if not exist .venv (
@@ -112,4 +113,4 @@ echo   设置：  http://localhost:%PORT%/settings  （摘要功能需先在这�
 echo.
 echo   关闭此窗口即停止服务。数据保存在 .\data\news.db，备份拷走就行。
 echo.
-.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port %PORT%
+.venv\Scripts\python -m uvicorn app.main:app --host %HOST% --port %PORT%
