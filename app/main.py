@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -36,14 +37,19 @@ def _mark_bookmarks(items: list[dict]) -> list[dict]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 启动时建表 + 先跑一次抓取（库里有数据页面才不空），再开定时任务
+    # 启动时建表；首抓放后台线程（30 个源顺序抓最坏数分钟，不能阻塞服务就绪——
+    # 30 源 × 25s 超时的尾部风险，页面为空提示由 AGENTS.md 既定语义覆盖）
     db.init_db()
-    logger.info("启动抓取（首次）…")
-    try:
-        summary = run_once()
-        logger.info("首次抓取完成：%s", summary.get("_total"))
-    except Exception as e:  # noqa: BLE001 - 首次失败不阻塞服务启动
-        logger.warning("首次抓取失败，稍后定时任务会重试: %s", e)
+
+    def _first_fetch():
+        try:
+            summary = run_once()
+            logger.info("首次抓取完成：%s", summary.get("_total"))
+        except Exception as e:  # noqa: BLE001 - 首次失败不阻塞服务启动
+            logger.warning("首次抓取失败，稍后定时任务会重试: %s", e)
+
+    logger.info("启动抓取（首次，后台）…")
+    threading.Thread(target=_first_fetch, name="first-fetch", daemon=True).start()
     scheduler.start()
     yield
     scheduler.scheduler.shutdown(wait=False)
