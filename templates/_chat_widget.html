@@ -292,8 +292,8 @@
       if (!d.sessions || !d.sessions.length) { sessionsList.innerHTML = '<div style="padding:8px 16px;font-size:11px;color:var(--muted)">暂无历史</div>'; return; }
       sessionsList.innerHTML = d.sessions.slice(0, 8).map(function (s) {
         var time = (s.last_at || "").replace("T", " ").slice(5, 16);
-        return '<div class="cd-session-item' + (s.session_id === sessionId ? " active" : "") + '" data-sid="' + s.session_id + '">' +
-          '<span>#' + s.session_id.slice(0, 8) + '</span><span class="time">' + time + " · " + s.msg_count + "条</span></div>";
+        return '<div class="cd-session-item' + (s.session_id === sessionId ? " active" : "") + '" data-sid="' + esc(s.session_id) + '">' +
+          '<span>#' + esc(s.session_id.slice(0, 8)) + '</span><span class="time">' + esc(time) + " · " + esc(s.msg_count) + "条</span></div>";
       }).join("");
       sessionsList.querySelectorAll(".cd-session-item").forEach(function (el) {
         el.onclick = async function () { sessionId = el.getAttribute("data-sid"); await loadHistory(sessionId); sessionsPanel.classList.add("hidden"); };
@@ -319,21 +319,40 @@
       var r = await fetch("/api/profile"); var d = await r.json();
       if (!d.profile || !d.profile.likes || !d.profile.likes.length) return;
       var likes = d.profile.likes.slice(0, 3);
-      suggestBox.innerHTML = likes.map(function (t) {
-        return '<span class="cd-suggest-chip" onclick="chatSend(\'最近有什么关于「' + t + '」的新动态？\')">' + t + " 有新动态吗？</span>";
-      }).join("") + '<span class="cd-suggest-chip" onclick="chatSend(\'热榜前 5 给我看看\')">📊 今日热榜</span>';
+      // 安全：likes 关键词不可信（/api/profile 无鉴权可写）——textContent 封死
+      // HTML 注入，addEventListener+闭包封死内联 onclick 的 JS 字符串注入
+      suggestBox.innerHTML = "";
+      likes.forEach(function (t) {
+        var chip = document.createElement("span");
+        chip.className = "cd-suggest-chip";
+        chip.textContent = t + " 有新动态吗？";
+        chip.addEventListener("click", function () { chatSend("最近有什么关于「" + t + "」的新动态？"); });
+        suggestBox.appendChild(chip);
+      });
+      var hot = document.createElement("span");
+      hot.className = "cd-suggest-chip"; hot.textContent = "📊 今日热榜";
+      hot.addEventListener("click", function () { chatSend("热榜前 5 给我看看"); });
+      suggestBox.appendChild(hot);
       suggestBox.classList.remove("hidden");
     } catch (e) {}
   }
 
   // ── 渲染 ──
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  // 安全：href 只允许 http(s)/协议相对/站内相对，其余降级为 #——LLM 输出/来源
+  // URL 可能被 feed 内容提示注入，javascript: 等 scheme 必须拦在渲染层
+  function safeHref(u) {
+    var s = String(u == null ? "" : u);
+    return /^(https?:)?\//.test(s) ? s : "#";
+  }
   function mdToHtml(md) {
     var s = esc(md);
     s = s.replace(/```(\w*)\n([\s\S]*?)```/g, "<pre>$2</pre>");
     s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
     s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
-    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--blue)">$1</a>');
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, txt, href) {
+      return '<a href="' + safeHref(href) + '" target="_blank" rel="noopener" style="color:var(--blue)">' + txt + "</a>";
+    });
     var lines = s.split("\n"); var html = []; var inTable = false;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
@@ -361,7 +380,7 @@
       var inner = '<div class="cd-bot-label">✦ 助手</div><div class="cd-bot-content">' + mdToHtml(text);
       if (sources && sources.length) {
         inner += '<div class="cd-sources">📎 ' + sources.slice(0, 5).map(function (s) {
-          return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
+          return '<a href="' + esc(safeHref(s.url)) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
         }).join(" · ") + "</div>";
       }
       inner += "</div>"; el.innerHTML = inner;
@@ -417,14 +436,16 @@
           if (ls.length) ls[ls.length - 1].textContent += " → " + (ev.count !== undefined ? ev.count + " 条" : "✓");
           break;
         case "confirm": loading.remove(); confirmBox.classList.remove("hidden");
-          confirmText.textContent = ev.description; sendBtn.disabled = false; break;
+          // 完整参数展示（textContent 安全）：确认条截断描述不得掩盖实际执行参数
+          confirmText.textContent = ev.description + "｜参数：" + JSON.stringify(ev.args || {});
+          sendBtn.disabled = false; break;
         case "reply": loading.remove(); addMsg("bot", ev.content); break;
         case "sources":
           var bs = msgs.querySelectorAll(".cd-msg.cd-bot");
           if (bs.length && ev.items && ev.items.length) {
             var lb = bs[bs.length - 1].querySelector(".cd-bot-content");
             if (lb) lb.innerHTML += '<div class="cd-sources">📎 ' + ev.items.slice(0, 5).map(function (s) {
-              return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
+              return '<a href="' + esc(safeHref(s.url)) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
             }).join(" · ") + "</div>";
           }
           break;

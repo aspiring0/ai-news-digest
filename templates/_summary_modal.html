@@ -99,7 +99,7 @@ async function loadSummary(regen) {
       '<div class="sec"><h4>01 这是什么</h4><p>' + esc(s.core) + "</p></div>" +
       '<div class="sec"><h4>02 关键事实</h4>' + facts + "</div>" +
       '<div class="sec"><h4>03 说人话</h4><p>' + esc(s.plain) + "</p></div>" +
-      '<div class="sec sum-link-section"><h4>04 原文链接</h4><p><a href="' + esc(_sumUrl) + '" target="_blank" rel="noopener">' + esc(_sumUrl) + "</a></p></div>" +
+      '<div class="sec sum-link-section"><h4>04 原文链接</h4><p><a href="' + esc(safeHref(_sumUrl)) + '" target="_blank" rel="noopener">' + esc(_sumUrl) + "</a></p></div>" +
       (s._cached ? '<p class="sum-cached">来自缓存（' + esc(s._created_at || "") + "）</p>" : "");
   } catch (e) {
     body.innerHTML =
@@ -143,6 +143,12 @@ function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });
+}
+/* 安全：href 只允许 http(s)/协议相对/站内相对，其余降级 #（URL 来自库内
+   条目，仍可能被恶意 feed 污染 scheme，渲染层单点收口） */
+function safeHref(u) {
+  var s = String(u == null ? "" : u);
+  return /^(https?:)?\//.test(s) ? s : "#";
 }
 /* 相对时间：今天显示「HH:MM · 刚刚/x 分钟前/x 小时前」，昨天带时间，更早回落日期 */
 function relTime(iso) {

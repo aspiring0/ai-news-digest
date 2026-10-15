@@ -149,3 +149,49 @@ def test_bookmark_confirm_wording_reflects_state(clean_db, monkeypatch):
     confirm2 = next((e for e in events2 if e["type"] == "confirm"), None)
     if confirm2:
         assert "取消收藏" in confirm2["description"]
+
+
+# ══════════════════════════════════════════════════════════
+# G5：前端 XSS 修复的静态契约（如实标注：无 JS 测试设施，锁住修复不被回退）
+# ══════════════════════════════════════════════════════════
+
+from pathlib import Path
+
+_WIDGET = Path(__file__).resolve().parents[1] / "templates" / "_chat_widget.html"
+_MODAL = Path(__file__).resolve().parents[1] / "templates" / "_summary_modal.html"
+
+
+def test_widget_safehref_defined_and_used():
+    src = _WIDGET.read_text(encoding="utf-8")
+    assert "function safeHref(u)" in src
+    assert "/^(https?:)?\\//.test(s)" in src
+    # mdToHtml 链接与两处 sources href 都过 safeHref
+    assert src.count("safeHref(") >= 4
+    # 回归锚点：不允许回到裸 $2 直填 href
+    assert "'<a href=\"$2\"" not in src
+
+
+def test_widget_chips_no_inline_onclick_concat():
+    src = _WIDGET.read_text(encoding="utf-8")
+    # 欢迎区的静态命令（chatSend('/trending')）是写死字符串，安全；
+    # 要封死的是"不可信变量拼进内联 onclick"——likes 重建后应只剩闭包方案
+    assert "chatSend(\'最近有什么关于「' + t" not in src, "likes 变量不得拼进内联 onclick"
+    assert "chip.textContent" in src and "chip.addEventListener" in src
+    # 拼接式 chips 构造（innerHTML + map）应已移除
+    assert "suggestBox.innerHTML = likes.map" not in src
+
+
+def test_widget_confirm_shows_full_args():
+    src = _WIDGET.read_text(encoding="utf-8")
+    assert "JSON.stringify(ev.args" in src, "确认条应完整展示参数"
+
+
+def test_modal_link_uses_safehref():
+    src = _MODAL.read_text(encoding="utf-8")
+    assert "function safeHref(u)" in src
+    assert "esc(safeHref(_sumUrl))" in src
+
+
+def test_widget_session_list_escaped():
+    src = _WIDGET.read_text(encoding="utf-8")
+    assert 'data-sid="\' + esc(s.session_id)' in src, "data-sid 属性值应经 esc"
