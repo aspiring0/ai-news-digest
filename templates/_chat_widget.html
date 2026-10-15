@@ -470,6 +470,50 @@
     } catch (e) { alert("导出失败"); }
   });
 
+  // ── 讨论某条文章 ──
+  var discussCtx = null;
+  window.chatDiscussArticle = function (url, title, source) {
+    open();
+    discussCtx = { url: url, title: title, source: source };
+    // 显示上下文提示
+    suggestBox.innerHTML = '<span style="font-size:12px;color:var(--blue-dark);background:var(--blue-bg);border:1px solid var(--blue);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:6px">' +
+      '📌 正在讨论：<b>' + esc(title.slice(0, 40)) + '</b>' +
+      '<span style="cursor:pointer;color:var(--muted);font-size:11px;margin-left:4px" onclick="chatClearDiscuss()">✕</span></span>';
+    suggestBox.classList.remove("hidden");
+    // 如果已有摘要缓存，自动获取
+    if (!sessionId || !msgs.querySelector(".cd-msg")) {
+      // 首次打开，自动分析
+      chatSend("我正在看「" + title + "」（来源：" + (source || "未知") + "，URL：" + url + "）。请帮我分析这条新闻的背景、影响和相关动态。");
+    } else {
+      // 已有对话，只设置上下文，等用户提问
+      input.placeholder = "关于「" + title.slice(0, 20) + "…」你想了解什么？";
+      input.focus();
+    }
+  };
+  window.chatClearDiscuss = function () {
+    discussCtx = null;
+    suggestBox.classList.add("hidden");
+    input.placeholder = "提问或输入 / 命令…";
+  };
+
+  // 发送时注入讨论上下文
+  var origSend = window.chatSend;
+  window.chatSend = async function (overrideMessage) {
+    var msg = overrideMessage;
+    if (discussCtx && !overrideMessage) {
+      // 用户手动输入时自动附带讨论上下文
+      var userText = input.value.trim();
+      if (userText) {
+        msg = userText + "\n\n[正在讨论] " + discussCtx.title + " | URL: " + discussCtx.url;
+      }
+    }
+    if (msg) {
+      await origSend(msg);
+    } else {
+      await origSend(overrideMessage);
+    }
+  };
+
   // ── 开屏：建议 + 简报 ──
   fab.addEventListener("click", async function () {
     open();
