@@ -177,7 +177,10 @@ def get_default() -> dict | None:
 def list_models(base_url: str, api_key: str = "", provider_id: str = "custom") -> dict:
     """一键获取模型列表：后端代理请求 {base_url}/models（浏览器直连第三方会跨域）。
 
-    key 优先用入参；留空则回退到该 provider 已保存的 key。返回 {ok, models} 或 {ok, message}。
+    key 优先用入参；留空时仅在「接口地址与已保存的完全一致」才回退到存量
+    key——与 save_provider 的"改址必须重输 key"规则对齐，防止无鉴权下
+    他人借 custom provider 把已保存 key 外发到任意域名（审计 P1-1）。
+    返回 {ok, models} 或 {ok, message}。
     """
     try:
         check_base_url(provider_id, base_url)
@@ -186,9 +189,10 @@ def list_models(base_url: str, api_key: str = "", provider_id: str = "custom") -
     key = api_key or ""
     if not key:
         saved = get_provider(provider_id)
-        key = saved["api_key"] if saved else ""
+        if saved and saved["base_url"] == base_url.rstrip("/"):
+            key = saved["api_key"]  # 同址：安全回退
     if not key:
-        return {"ok": False, "message": "请先填写 key（该 provider 也未保存过 key）"}
+        return {"ok": False, "message": "请先填写 key（接口地址与已保存的不一致时必须重输）"}
     try:
         resp = requests.get(
             base_url.rstrip("/") + "/models",

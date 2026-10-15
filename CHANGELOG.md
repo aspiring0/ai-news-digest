@@ -26,6 +26,21 @@
 - **测试**：+70 用例（urlguard 判定表全分支 / 逐跳重定向 / 端点允许列表 /
   custom-sources 校验），保持零网络原则（DNS 与 HTTP 全 mock）。
 
+安全修复：provider 存量 key 外发（审计 P1-1）
+
+- **为什么**：`POST /api/providers/models` 传 `custom-*` id + 任意 `base_url`
+  + 空 `api_key`，后端会回退使用已保存的 key 并以 Bearer 发往该任意域名——
+  绕过了 save_provider"修改接口地址必须重输 key"的既有防护；局域网/公网
+  暴露场景下可直接窃取付费 API key（默认本机部署下浏览器恶意页面发不出
+  JSON POST，受 CORS 预检阻拦）。
+- **做了什么**：`list_models` 的存量 key 回退收紧为"接口地址与已保存值完全
+  一致"才生效（与 save_provider 的比较语义对齐）；地址不一致且未传 key 时
+  直接返回错误，不发起任何 HTTP 请求。`test_connection` 本就无回退逻辑，
+  补一条防漂移回归测试锁住"不读存量 key"的语义。同址"一键获取模型"的
+  既有 UX（含 custom provider）不受影响。
+- **测试**：+4 用例（异址拒发且零请求 / custom 同址回退 / 自带 key 异址放行 /
+  test_connection 不触存储）。
+
 ## v0.4.2（2026-10-13）
 
 PWA / 推送通知 / 英文 README
