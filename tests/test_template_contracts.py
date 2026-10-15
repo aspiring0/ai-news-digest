@@ -18,3 +18,11 @@ def test_health_panel_values_escaped():
     assert "escH(n)" in src, "源名应转义"
     # 回归锚点：不允许退回未转义的裸拼接
     assert "'<div class=\"health-row\"><span>' + n +" not in src
+
+
+def test_health_panel_zero_fetch_shows_warning():
+    """P3：ok 但 0 条不再显示绿色——失败被源内部捕获后返回空列表，
+    绿色 ✓ 0 条会掩盖问题，应有黄色 ⚠ 分支（用现有 --amber-text 变量）。"""
+    src = _tpl.read_text(encoding="utf-8")
+    assert 'style="color:var(--amber-text)">⚠ 0 条</span>' in src, "ok 且 0 条应有黄色 ⚠ 0 条分支"
+    assert "Number(s.fetched) > 0" in src, "绿色 ✓ 分支应以 fetched>0 为条件"
