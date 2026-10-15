@@ -1,126 +1,241 @@
-<!-- Agent 聊天框 v3：流式 + 确认 + 上下文 + 斜杠命令 + 会话列表 + 主动建议 + Token 统计 -->
+<!-- Agent 侧边抽屉：Cursor/Copilot 风格，右侧滑入，全高 -->
 <div id="chat-fab" title="AI 资讯助手">💬</div>
-<div id="chat-panel" class="hidden">
-  <div class="chat-head">
-    <b>AI 资讯助手</b>
-    <span style="display:flex;gap:4px;align-items:center">
-      <button id="chat-sessions-btn" title="历史会话" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px">📋</button>
-      <button id="chat-export" title="导出" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">导出</button>
-      <button id="chat-clear" title="清空" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
-      <button id="chat-close" title="收起" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
-    </span>
-  </div>
+<div id="chat-mask"></div>
+<aside id="chat-drawer" aria-label="AI 资讯助手">
+  <header class="cd-head">
+    <div class="cd-title">
+      <span class="cd-icon">✦</span>
+      <b>AI 资讯助手</b>
+    </div>
+    <div class="cd-actions">
+      <button id="chat-sessions-btn" title="历史会话" class="cd-btn">📋</button>
+      <button id="chat-export" title="导出 Markdown" class="cd-btn">📥</button>
+      <button id="chat-clear" title="清空对话" class="cd-btn">🗑</button>
+      <button id="chat-close" title="关闭" class="cd-btn">✕</button>
+    </div>
+  </header>
 
-  <!-- A8: 会话列表面板 -->
-  <div id="chat-sessions" class="chat-sessions hidden">
-    <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px dashed var(--border)">历史会话（点击切换）</div>
+  <!-- A8: 会话列表（下拉覆盖） -->
+  <div id="chat-sessions" class="cd-sessions hidden">
+    <div class="cd-sessions-title">历史会话</div>
     <div id="chat-sessions-list"></div>
   </div>
 
-  <!-- A10: 主动建议 -->
-  <div id="chat-suggest" class="chat-suggest hidden"></div>
+  <!-- A10: 主动建议（chips） -->
+  <div id="chat-suggest" class="cd-suggest hidden"></div>
 
-  <div id="chat-messages" class="chat-body">
-    <div class="chat-hint">用自然语言或 <b>/</b> 命令操控：<br>·「最近有什么 Claude 新闻？」<br>·「热榜前 5」 ·「这条收藏一下」<br>· <code>/search 关键词</code> · <code>/trending</code> · <code>/health</code></div>
+  <!-- 消息流 -->
+  <div id="chat-messages" class="cd-body">
+    <div class="cd-welcome">
+      <div class="cd-welcome-icon">✦</div>
+      <p>操控你的资讯台</p>
+      <div class="cd-cmd-list">
+        <span class="cd-cmd" onclick="chatSend('/trending')">📊 今日热榜</span>
+        <span class="cd-cmd" onclick="chatSend('/health')">📡 源状态</span>
+        <span class="cd-cmd" onclick="chatSend('/help')">❓ 我能做什么</span>
+      </div>
+    </div>
   </div>
 
-  <!-- A2: 斜杠命令自动补全 -->
-  <div id="chat-cmd-hint" class="chat-cmd-hint hidden"></div>
+  <!-- A2: 斜杠命令补全 -->
+  <div id="chat-cmd-hint" class="cd-cmd-hint hidden"></div>
 
-  <div id="chat-tools" class="chat-tools hidden"></div>
-  <div id="chat-confirm" class="chat-confirm hidden">
+  <!-- 工具调用（折叠显示） -->
+  <details id="chat-tools-wrap" class="cd-tools hidden">
+    <summary>🔧 工具调用</summary>
+    <div id="chat-tools"></div>
+  </details>
+
+  <!-- 确认条 -->
+  <div id="chat-confirm" class="cd-confirm hidden">
     <span id="chat-confirm-text"></span>
-    <span>
-      <button id="chat-confirm-yes">✓ 确认</button>
-      <button id="chat-confirm-no">✗ 取消</button>
+    <span class="cd-confirm-btns">
+      <button id="chat-confirm-yes">✓</button>
+      <button id="chat-confirm-no">✗</button>
     </span>
   </div>
 
-  <div class="chat-input-row">
-    <input type="text" id="chat-input" placeholder="输入消息或 / 命令…" aria-label="消息" autocomplete="off">
-    <button id="chat-send">发送</button>
+  <!-- 输入区 -->
+  <div class="cd-input-zone">
+    <div class="cd-input-row">
+      <textarea id="chat-input" placeholder="提问或输入 / 命令…" rows="1" aria-label="消息"></textarea>
+      <button id="chat-send" title="发送">➤</button>
+    </div>
+    <div id="chat-tokens" class="cd-tokens hidden"></div>
   </div>
-  <div id="chat-tokens" class="chat-tokens hidden"></div>
-</div>
+</aside>
 
 <style>
+  /* ── 浮动按钮 ── */
   #chat-fab { position:fixed;bottom:20px;right:20px;z-index:80;width:48px;height:48px;
     border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:22px;cursor:pointer;
-    box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center; }
+    box-shadow:0 4px 14px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;
+    transition:transform .2s,opacity .2s; }
   #chat-fab:hover{transform:scale(1.08)}
-  #chat-panel.hidden{display:none}
-  #chat-panel{position:fixed;bottom:80px;right:20px;z-index:81;width:min(420px,calc(100vw - 32px));
-    max-height:min(600px,calc(100vh - 120px));background:var(--card);border:1px solid var(--border);
-    border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden}
-  .chat-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
-    border-bottom:2px solid var(--text);background:var(--bg)}
-  .chat-head b{font-family:var(--serif);font-size:14px}
+  body.chat-open #chat-fab{opacity:0;pointer-events:none;transform:scale(.6)}
 
-  .chat-sessions{max-height:160px;overflow-y:auto;border-bottom:1px solid var(--border);background:var(--bg)}
-  .chat-sessions.hidden{display:none}
-  .chat-session-item{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;
-    font-size:12px;cursor:pointer;border-bottom:1px dashed var(--border)}
-  .chat-session-item:hover{background:var(--blue-bg)}
-  .chat-session-item.active{background:var(--blue-bg);font-weight:600}
-  .chat-session-item .time{color:var(--muted);font-size:10px}
+  /* ── 遮罩 ── */
+  #chat-mask{position:fixed;inset:0;background:rgba(28,25,23,.08);z-index:84;
+    opacity:0;pointer-events:none;transition:opacity .25s}
+  body.chat-open #chat-mask{opacity:1;pointer-events:auto}
 
-  .chat-suggest{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px dashed var(--border);background:var(--bg)}
-  .chat-suggest.hidden{display:none}
-  .suggest-chip{font-size:11px;padding:3px 10px;border:1px solid var(--blue);border-radius:999px;
-    color:var(--blue-dark);cursor:pointer;background:var(--blue-bg)}
-  .suggest-chip:hover{background:var(--blue);color:#fff}
+  /* ── 侧边抽屉 ── */
+  #chat-drawer{
+    position:fixed;top:0;right:0;bottom:0;z-index:85;
+    width:min(420px,100vw);
+    background:var(--card);border-left:1px solid var(--border);
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  body.chat-open #chat-drawer{transform:translateX(0)}
 
-  .chat-body{flex:1;overflow-y:auto;padding:12px;font-size:13.5px;line-height:1.65;
-    display:flex;flex-direction:column;gap:10px}
-  .chat-hint{color:var(--muted);font-size:12px;text-align:center;padding:12px 8px;line-height:2}
-  .chat-msg{max-width:88%;padding:8px 12px;border-radius:10px;overflow-wrap:anywhere}
-  .chat-msg.user{align-self:flex-end;background:var(--blue-bg);color:var(--blue-dark);border:1px solid var(--blue)}
-  .chat-msg.bot{align-self:flex-start;background:var(--bg);border:1px solid var(--border)}
-  .chat-msg .chat-sources{margin-top:6px;font-size:11px;color:var(--muted)}
-  .chat-msg .chat-sources a{color:var(--blue);text-decoration:none}
-  .chat-loading{color:var(--muted);font-size:12px;align-self:flex-start;padding:4px 12px}
-  .chat-loading::after{content:"…";animation:dots 1.5s infinite}
-  @keyframes dots{0%,100%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+  /* ── 头部 ── */
+  .cd-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 16px 12px;border-bottom:2px solid var(--text);
+    background:var(--bg);flex-shrink:0;
+  }
+  .cd-title{display:flex;align-items:center;gap:8px}
+  .cd-title b{font-family:var(--serif);font-size:15px;letter-spacing:.02em}
+  .cd-icon{font-size:18px;color:var(--blue)}
+  .cd-actions{display:flex;gap:2px}
+  .cd-btn{border:none;background:none;font-size:14px;cursor:pointer;
+    color:var(--muted);width:30px;height:30px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;transition:all .15s}
+  .cd-btn:hover{background:var(--blue-bg);color:var(--blue-dark)}
 
-  .chat-cmd-hint{padding:4px 12px;background:var(--bg);border-top:1px dashed var(--border);font-size:12px}
-  .chat-cmd-hint.hidden{display:none}
-  .chat-cmd-hint .cmd-item{padding:2px 0;cursor:pointer;color:var(--blue-dark)}
-  .chat-cmd-hint .cmd-item:hover{text-decoration:underline}
-  .chat-cmd-hint .cmd-desc{color:var(--muted);margin-left:8px;font-size:11px}
+  /* ── 会话列表 ── */
+  .cd-sessions{position:absolute;top:52px;left:0;right:0;z-index:10;
+    background:var(--card);border-bottom:2px solid var(--border);
+    max-height:180px;overflow-y:auto;box-shadow:0 8px 20px rgba(0,0,0,.1)}
+  .cd-sessions.hidden{display:none}
+  .cd-sessions-title{padding:8px 16px 4px;font-size:11px;color:var(--muted);letter-spacing:.06em}
+  .cd-session-item{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 16px;font-size:12px;cursor:pointer;border-bottom:1px dashed var(--border)}
+  .cd-session-item:hover{background:var(--blue-bg)}
+  .cd-session-item.active{background:var(--blue-bg);font-weight:600}
+  .cd-session-item .time{color:var(--muted);font-size:10px}
 
-  .chat-tools{padding:6px 12px;border-top:1px dashed var(--border);font-size:11px;color:var(--muted);
-    max-height:60px;overflow-y:auto;background:var(--bg)}
-  .chat-tools.hidden{display:none}
-  .chat-tools .tool-line{margin:2px 0}
+  /* ── 主动建议 ── */
+  .cd-suggest{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;
+    border-bottom:1px dashed var(--border);background:var(--bg);flex-shrink:0}
+  .cd-suggest.hidden{display:none}
+  .cd-suggest-chip{font-size:11px;padding:3px 10px;border:1px solid var(--blue);
+    border-radius:999px;color:var(--blue-dark);cursor:pointer;background:var(--blue-bg);
+    transition:all .15s}
+  .cd-suggest-chip:hover{background:var(--blue);color:#fff}
 
-  .chat-confirm{display:flex;justify-content:space-between;align-items:center;gap:8px;
-    padding:10px 12px;border-top:2px solid var(--amber-text);background:var(--amber-bg);
-    font-size:12.5px;color:var(--amber-text)}
-  .chat-confirm.hidden{display:none}
-  .chat-confirm button{border:1px solid var(--amber-text);background:none;color:var(--amber-text);
-    border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;margin-left:4px}
-  .chat-confirm #chat-confirm-yes{background:var(--amber-text);color:#fff}
+  /* ── 消息流 ── */
+  .cd-body{flex:1;overflow-y:auto;padding:16px;font-size:13.5px;line-height:1.7;
+    display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
 
-  .chat-input-row{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border)}
-  .chat-input-row input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;
-    background:var(--bg);color:var(--text);font-size:13px}
-  .chat-input-row input:focus{outline:none;border-color:var(--blue)}
-  .chat-input-row button{border:none;background:var(--blue);color:#fff;border-radius:8px;
-    padding:6px 16px;font-size:13px;cursor:pointer}
-  .chat-input-row button:disabled{opacity:.5}
+  .cd-welcome{text-align:center;padding:40px 20px;color:var(--muted)}
+  .cd-welcome-icon{font-size:32px;color:var(--blue);margin-bottom:8px}
+  .cd-welcome p{font-family:var(--serif);font-size:15px;margin:0 0 16px;color:var(--text)}
+  .cd-cmd-list{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .cd-cmd{font-size:12px;padding:6px 16px;border:1px solid var(--border);
+    border-radius:8px;cursor:pointer;color:var(--muted);background:var(--bg);
+    transition:all .15s;min-width:140px;text-align:center}
+  .cd-cmd:hover{border-color:var(--blue);color:var(--blue-dark);background:var(--blue-bg)}
 
-  .chat-tokens{padding:4px 12px;font-size:10px;color:var(--muted);text-align:right;background:var(--bg);
-    border-top:1px dashed var(--border)}
-  .chat-tokens.hidden{display:none}
+  .cd-msg{max-width:100%;overflow-wrap:anywhere;line-height:1.65}
+  .cd-msg.cd-user{
+    align-self:flex-end;max-width:85%;
+    background:var(--blue-bg);color:var(--blue-dark);
+    border:1px solid var(--blue);border-radius:14px 14px 4px 14px;
+    padding:10px 14px;font-size:13px;
+  }
+  .cd-msg.cd-bot{
+    align-self:flex-start;max-width:95%;
+    padding:2px 0;
+  }
+  .cd-msg.cd-bot .cd-bot-label{
+    font-size:10px;color:var(--blue);margin-bottom:4px;letter-spacing:.06em;
+  }
+  .cd-msg.cd-bot .cd-bot-content{
+    padding:10px 14px;background:var(--bg);border:1px solid var(--border);
+    border-radius:4px 14px 14px 14px;font-size:13px;
+  }
+  .cd-msg .cd-sources{margin-top:8px;font-size:11px;color:var(--muted);
+    padding:6px 10px;background:var(--bg);border-radius:6px;border:1px dashed var(--border)}
+  .cd-msg .cd-sources a{color:var(--blue);text-decoration:none}
+  .cd-loading{color:var(--muted);font-size:12px;align-self:flex-start;padding:4px 14px}
+  .cd-loading::after{content:"…";animation:cdDots 1.5s infinite}
+  @keyframes cdDots{0%,100%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+  /* ── 斜杠命令补全 ── */
+  .cd-cmd-hint{padding:6px 16px;background:var(--bg);border-top:1px dashed var(--border);
+    font-size:12px;flex-shrink:0}
+  .cd-cmd-hint.hidden{display:none}
+  .cd-cmd-hint .cmd-item{padding:3px 0;cursor:pointer;color:var(--blue-dark)}
+  .cd-cmd-hint .cmd-item:hover{text-decoration:underline}
+  .cd-cmd-hint .cmd-desc{color:var(--muted);margin-left:8px;font-size:11px}
+
+  /* ── 工具调用 ── */
+  .cd-tools{padding:4px 16px;border-top:1px dashed var(--border);
+    font-size:11px;color:var(--muted);background:var(--bg);flex-shrink:0}
+  .cd-tools.hidden{display:none}
+  .cd-tools summary{cursor:pointer;padding:4px 0;user-select:none}
+  .cd-tools .tool-line{margin:2px 0;padding:2px 8px;background:var(--card);
+    border-radius:4px;border:1px solid var(--border)}
+
+  /* ── 确认条 ── */
+  .cd-confirm{display:flex;justify-content:space-between;align-items:center;gap:8px;
+    padding:12px 16px;border-top:2px solid var(--amber-text);
+    background:var(--amber-bg);font-size:12.5px;color:var(--amber-text);flex-shrink:0}
+  .cd-confirm.hidden{display:none}
+  .cd-confirm-btns{display:flex;gap:6px}
+  .cd-confirm-btns button{border:1px solid var(--amber-text);background:none;
+    color:var(--amber-text);border-radius:6px;padding:4px 12px;font-size:13px;cursor:pointer}
+  .cd-confirm-btns #chat-confirm-yes{background:var(--amber-text);color:#fff}
+
+  /* ── 输入区 ── */
+  .cd-input-zone{padding:12px 16px 8px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
+  .cd-input-row{display:flex;gap:8px;align-items:flex-end}
+  .cd-input-row textarea{
+    flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:12px;
+    background:var(--card);color:var(--text);font-size:13px;
+    resize:none;min-height:40px;max-height:120px;line-height:1.5;
+    font-family:inherit;transition:border-color .15s;
+  }
+  .cd-input-row textarea:focus{outline:none;border-color:var(--blue)}
+  .cd-input-row textarea::placeholder{color:var(--muted)}
+  .cd-input-row button{
+    width:40px;height:40px;border:none;background:var(--blue);color:#fff;
+    border-radius:50%;font-size:16px;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;transition:all .15s;
+  }
+  .cd-input-row button:hover:not(:disabled){transform:scale(1.06)}
+  .cd-input-row button:disabled{opacity:.4;cursor:default}
+
+  .cd-tokens{padding:2px 4px 4px;font-size:10px;color:var(--muted);text-align:right}
+  .cd-tokens.hidden{display:none}
+
+  /* ── 移动端 ── */
+  @media (max-width:640px){
+    #chat-drawer{width:100vw}
+    #chat-mask{background:rgba(28,25,23,.3)}
+    .cd-msg.cd-user{max-width:92%}
+    .cd-msg.cd-bot{max-width:100%}
+  }
+
+  /* ── Markdown 渲染 ── */
+  .cd-bot-content table{border-collapse:collapse;width:100%;font-size:12px;margin:6px 0}
+  .cd-bot-content td{border:1px solid var(--border);padding:4px 8px}
+  .cd-bot-content th{border:1px solid var(--border);padding:4px 8px;background:var(--bg);font-weight:600}
+  .cd-bot-content pre{background:var(--bg);padding:8px;border-radius:6px;font-size:12px;overflow-x:auto;margin:6px 0}
+  .cd-bot-content code{background:var(--bg);padding:1px 4px;border-radius:3px;font-size:12px}
+  .cd-bot-content li{margin-left:16px;margin-top:2px}
 </style>
 
 <script>
 (function () {
   var fab = document.getElementById("chat-fab");
-  var panel = document.getElementById("chat-panel");
+  var mask = document.getElementById("chat-mask");
   var msgs = document.getElementById("chat-messages");
   var input = document.getElementById("chat-input");
   var sendBtn = document.getElementById("chat-send");
+  var toolsWrap = document.getElementById("chat-tools-wrap");
   var toolsBox = document.getElementById("chat-tools");
   var confirmBox = document.getElementById("chat-confirm");
   var confirmText = document.getElementById("chat-confirm-text");
@@ -132,174 +247,133 @@
   var sessionId = "";
   var totalTokens = 0;
 
+  function open() { document.body.classList.add("chat-open"); input.focus(); }
+  function close() { document.body.classList.remove("chat-open"); sessionsPanel.classList.add("hidden"); }
+  fab.addEventListener("click", open);
+  mask.addEventListener("click", close);
+  document.getElementById("chat-close").addEventListener("click", close);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+
   // ── A2: 斜杠命令 ──
   var COMMANDS = {
-    "/search": { desc: "搜索新闻", usage: "/search <关键词>", to: function (args) { return "搜索 " + args; } },
-    "/trending": { desc: "热榜", usage: "/trending [条数]", to: function (args) { return "热榜前 " + (args || 5) + " 条"; } },
-    "/health": { desc: "源状态", usage: "/health", to: function () { return "各源最近状态如何？有多少个正常？"; } },
-    "/bookmark": { desc: "收藏", usage: "/bookmark <URL或编号>", to: function (args) { return "帮我收藏 " + args; } },
-    "/block": { desc: "屏蔽", usage: "/block <来源或分类>", to: function (args) { return "帮我屏蔽 " + args; } },
-    "/summary": { desc: "摘要", usage: "/summary <关键词>", to: function (args) { return "给我一篇关于 " + args + " 的摘要"; } },
-    "/help": { desc: "帮助", usage: "/help", to: function () { return "你能做什么？列出你的所有功能。"; } },
+    "/search": { desc: "搜索新闻", to: function (a) { return "搜索 " + a; } },
+    "/trending": { desc: "热榜", to: function (a) { return "热榜前 " + (a || 5) + " 条"; } },
+    "/health": { desc: "源状态", to: function () { return "各源状态如何？"; } },
+    "/bookmark": { desc: "收藏", to: function (a) { return "帮我收藏 " + a; } },
+    "/block": { desc: "屏蔽", to: function (a) { return "帮我屏蔽 " + a; } },
+    "/help": { desc: "帮助", to: function () { return "你能做什么？"; } },
   };
-
   function showCmdHint(prefix) {
     var matches = Object.keys(COMMANDS).filter(function (c) { return c.startsWith(prefix); });
-    if (!matches.length || prefix === "/") { cmdHint.classList.add("hidden"); return; }
-    if (prefix.length <= 1 && matches.length === Object.keys(COMMANDS).length) {
-      // 输入 / 时显示全部
-    }
+    if (!matches.length) { cmdHint.classList.add("hidden"); return; }
     cmdHint.innerHTML = matches.map(function (c) {
       return '<div class="cmd-item" data-cmd="' + c + '">' + c + ' <span class="cmd-desc">' + COMMANDS[c].desc + "</span></div>";
     }).join("");
     cmdHint.classList.remove("hidden");
     cmdHint.querySelectorAll(".cmd-item").forEach(function (el) {
-      el.addEventListener("click", function () {
-        input.value = el.getAttribute("data-cmd") + " ";
-        cmdHint.classList.add("hidden");
-        input.focus();
-      });
+      el.onclick = function () { input.value = el.getAttribute("data-cmd") + " "; cmdHint.classList.add("hidden"); input.focus(); };
     });
   }
-
   input.addEventListener("input", function () {
     var v = input.value.trim();
-    if (v.startsWith("/") && !v.includes(" ")) showCmdHint(v);
-    else cmdHint.classList.add("hidden");
+    if (v.startsWith("/") && !v.includes(" ")) showCmdHint(v); else cmdHint.classList.add("hidden");
+    input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 120) + "px";
   });
-
   function translateCommand(text) {
-    var trimmed = text.trim();
-    if (!trimmed.startsWith("/")) return text;
-    var parts = trimmed.split(/\s+(.+)/);
-    var cmd = parts[0];
-    var args = parts[1] || "";
-    if (COMMANDS[cmd]) return COMMANDS[cmd].to(args);
-    return text; // 未知命令原样发送
+    var t = text.trim(); if (!t.startsWith("/")) return text;
+    var parts = t.split(/\s+(.+)/); var cmd = parts[0]; var args = parts[1] || "";
+    return COMMANDS[cmd] ? COMMANDS[cmd].to(args) : text;
   }
 
   // ── A8: 会话列表 ──
   async function loadSessions() {
     try {
-      var r = await fetch("/api/chat/sessions");
-      var d = await r.json();
-      if (!d.sessions || !d.sessions.length) {
-        sessionsList.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">暂无历史会话</div>';
-        return;
-      }
+      var r = await fetch("/api/chat/sessions"); var d = await r.json();
+      if (!d.sessions || !d.sessions.length) { sessionsList.innerHTML = '<div style="padding:8px 16px;font-size:11px;color:var(--muted)">暂无历史</div>'; return; }
       sessionsList.innerHTML = d.sessions.slice(0, 8).map(function (s) {
         var time = (s.last_at || "").replace("T", " ").slice(5, 16);
-        var active = s.session_id === sessionId ? " active" : "";
-        return '<div class="chat-session-item' + active + '" data-sid="' + s.session_id + '">' +
-          '<span>#' + s.session_id.slice(0, 8) + '</span><span class="time">' + time + ' · ' + s.msg_count + '条</span></div>';
+        return '<div class="cd-session-item' + (s.session_id === sessionId ? " active" : "") + '" data-sid="' + s.session_id + '">' +
+          '<span>#' + s.session_id.slice(0, 8) + '</span><span class="time">' + time + " · " + s.msg_count + "条</span></div>";
       }).join("");
-      sessionsList.querySelectorAll(".chat-session-item").forEach(function (el) {
-        el.addEventListener("click", async function () {
-          sessionId = el.getAttribute("data-sid");
-          await loadHistory(sessionId);
-          sessionsPanel.classList.add("hidden");
-        });
+      sessionsList.querySelectorAll(".cd-session-item").forEach(function (el) {
+        el.onclick = async function () { sessionId = el.getAttribute("data-sid"); await loadHistory(sessionId); sessionsPanel.classList.add("hidden"); };
       });
-    } catch (e) { /* 静默 */ }
+    } catch (e) {}
   }
-
   document.getElementById("chat-sessions-btn").addEventListener("click", function () {
     sessionsPanel.classList.toggle("hidden");
     if (!sessionsPanel.classList.contains("hidden")) loadSessions();
   });
-
   async function loadHistory(sid) {
     msgs.innerHTML = "";
     try {
       var r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sid));
       var d = await r.json();
       d.messages.forEach(function (m) { addMsg(m.role === "user" ? "user" : "bot", m.content); });
-    } catch (e) { /* 静默 */ }
+    } catch (e) {}
   }
 
   // ── A10: 主动建议 ──
   async function loadSuggestions() {
     try {
-      var r = await fetch("/api/profile");
-      var d = await r.json();
+      var r = await fetch("/api/profile"); var d = await r.json();
       if (!d.profile || !d.profile.likes || !d.profile.likes.length) return;
       var likes = d.profile.likes.slice(0, 3);
-      suggestBox.innerHTML = likes.map(function (topic) {
-        return '<span class="suggest-chip" data-topic="' + topic + '">🔎 ' + topic + '有新动态吗？</span>';
-      }).join("") + '<span class="suggest-chip" data-topic="__trending">📊 今日热榜</span>';
+      suggestBox.innerHTML = likes.map(function (t) {
+        return '<span class="cd-suggest-chip" onclick="chatSend(\'最近有什么关于「' + t + '」的新动态？\')">' + t + " 有新动态吗？</span>";
+      }).join("") + '<span class="cd-suggest-chip" onclick="chatSend(\'热榜前 5 给我看看\')">📊 今日热榜</span>';
       suggestBox.classList.remove("hidden");
-      suggestBox.querySelectorAll(".suggest-chip").forEach(function (chip) {
-        chip.addEventListener("click", function () {
-          var t = chip.getAttribute("data-topic");
-          var msg = t === "__trending" ? "热榜前 5 给我看看" : "最近有什么关于「" + t + "」的新动态？";
-          send(msg);
-        });
-      });
-    } catch (e) { /* 无画像时静默 */ }
+    } catch (e) {}
   }
 
-  // ── 工具函数 ──
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
-    });
-  }
-
+  // ── 渲染 ──
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
   function mdToHtml(md) {
     var s = esc(md);
-    s = s.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg);padding:8px;border-radius:6px;font-size:12px;overflow-x:auto">$2</pre>');
-    s = s.replace(/`([^`]+)`/g, '<code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
+    s = s.replace(/```(\w*)\n([\s\S]*?)```/g, "<pre>$2</pre>");
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
     s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--blue)">$1</a>');
-    var lines = s.split("\n");
-    var html = [];
-    var inTable = false;
+    var lines = s.split("\n"); var html = []; var inTable = false;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
       if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
         var cells = line.split("|").slice(1, -1).map(function (c) { return c.trim(); });
         if (cells.every(function (c) { return /^[-: ]+$/.test(c); })) continue;
-        if (!inTable) { html.push('<table style="border-collapse:collapse;width:100%;font-size:12px;margin:4px 0">'); inTable = true; }
-        html.push("<tr>" + cells.map(function (c) { return '<td style="border:1px solid var(--border);padding:4px 8px">' + c + "</td>"; }).join("") + "</tr>");
+        if (!inTable) { html.push('<table>'); inTable = true; }
+        html.push("<tr>" + cells.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr>");
       } else {
         if (inTable) { html.push("</table>"); inTable = false; }
-        if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
-          html.push("<li style='margin-left:16px'>" + line.trim().slice(2) + "</li>");
-        } else if (/^\d+\.\s/.test(line.trim())) {
-          html.push("<li style='margin-left:16px;list-style:decimal'>" + line.trim().replace(/^\d+\.\s/, "") + "</li>");
-        } else { html.push(line); }
+        if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) html.push("<li>" + line.trim().slice(2) + "</li>");
+        else if (/^\d+\.\s/.test(line.trim())) html.push("<li>" + line.trim().replace(/^\d+\.\s/, "") + "</li>");
+        else html.push(line);
       }
     }
     if (inTable) html.push("</table>");
     return html.join("\n").replace(/\n/g, "<br>");
   }
-
   function addMsg(role, text, sources) {
     var el = document.createElement("div");
-    el.className = "chat-msg " + role;
-    var html = role === "bot" ? mdToHtml(text) : esc(text).replace(/\n/g, "<br>");
-    if (sources && sources.length) {
-      html += '<div class="chat-sources">📎 ';
-      html += sources.slice(0, 5).map(function (s) {
-        return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
-      }).join(" · ");
-      html += "</div>";
+    if (role === "user") {
+      el.className = "cd-msg cd-user"; el.textContent = text;
+    } else {
+      el.className = "cd-msg cd-bot";
+      var inner = '<div class="cd-bot-label">✦ 助手</div><div class="cd-bot-content">' + mdToHtml(text);
+      if (sources && sources.length) {
+        inner += '<div class="cd-sources">📎 ' + sources.slice(0, 5).map(function (s) {
+          return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
+        }).join(" · ") + "</div>";
+      }
+      inner += "</div>"; el.innerHTML = inner;
     }
-    el.innerHTML = html;
-    msgs.appendChild(el);
-    msgs.scrollTop = msgs.scrollHeight;
-    return el;
+    msgs.appendChild(el); msgs.scrollTop = msgs.scrollHeight;
   }
-
   function addToolLine(tool, args, count) {
-    toolsBox.classList.remove("hidden");
-    var line = document.createElement("div");
-    line.className = "tool-line";
-    line.textContent = "🔧 " + tool + "(" + JSON.stringify(args || {}).slice(0, 50) + ")" + (count !== undefined ? " → " + count + " 条" : "…");
+    toolsWrap.classList.remove("hidden");
+    var line = document.createElement("div"); line.className = "tool-line";
+    line.textContent = tool + "(" + JSON.stringify(args || {}).slice(0, 50) + ")" + (count !== undefined ? " → " + count + " 条" : "");
     toolsBox.appendChild(line);
-    toolsBox.scrollTop = toolsBox.scrollHeight;
   }
-
   function getPageContext() {
     var items = [];
     document.querySelectorAll(".item[data-url]").forEach(function (el, i) {
@@ -308,164 +382,115 @@
     return items;
   }
 
-  function updateTokens(usage) {
-    if (usage && usage.total_tokens) {
-      totalTokens += usage.total_tokens;
-      tokensBox.textContent = "本次会话 ~" + totalTokens.toLocaleString() + " tokens";
-      tokensBox.classList.remove("hidden");
-    }
-  }
-
-  // ── 发送（流式） ──
-  async function send(overrideMessage) {
+  // ── 发送 ──
+  window.chatSend = async function (overrideMessage) {
     var raw = overrideMessage || input.value.trim();
     if (!raw || sendBtn.disabled) return;
-    if (!overrideMessage) input.value = "";
-    cmdHint.classList.add("hidden");
-    sendBtn.disabled = true;
+    if (!overrideMessage) { input.value = ""; input.style.height = "auto"; }
+    cmdHint.classList.add("hidden"); sendBtn.disabled = true;
     var text = translateCommand(raw);
-    addMsg("user", raw); // 显示原始输入（含 / 命令）
-
-    var loading = document.createElement("div");
-    loading.className = "chat-loading";
-    loading.textContent = "思考中";
-    msgs.appendChild(loading);
-    msgs.scrollTop = msgs.scrollHeight;
-
+    addMsg("user", raw);
+    var loading = document.createElement("div"); loading.className = "cd-loading"; loading.textContent = "思考中";
+    msgs.appendChild(loading); msgs.scrollTop = msgs.scrollHeight;
     try {
       var resp = await fetch("/api/chat/stream", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, session_id: sessionId, page_context: getPageContext() })
       });
-      var reader = resp.body.getReader();
-      var decoder = new TextDecoder();
-      var buf = "";
+      var reader = resp.body.getReader(); var decoder = new TextDecoder(); var buf = "";
       while (true) {
-        var chunk = await reader.read();
-        if (chunk.done) break;
+        var chunk = await reader.read(); if (chunk.done) break;
         buf += decoder.decode(chunk.value, { stream: true });
-        var lines = buf.split("\n");
-        buf = lines.pop();
+        var lines = buf.split("\n"); buf = lines.pop();
         for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (!line.startsWith("data: ")) continue;
+          var line = lines[i].trim(); if (!line.startsWith("data: ")) continue;
           try { handleEvent(JSON.parse(line.slice(6))); } catch (e) {}
         }
       }
     } catch (e) { loading.remove(); addMsg("bot", "❌ 网络错误"); }
-    loading.remove();
-    sendBtn.disabled = false;
-    input.focus();
-
+    loading.remove(); sendBtn.disabled = false; input.focus();
     function handleEvent(ev) {
       switch (ev.type) {
         case "tool": addToolLine(ev.tool, ev.args); break;
         case "tool_result":
-          var lines2 = toolsBox.querySelectorAll(".tool-line");
-          if (lines2.length) {
-            var last = lines2[lines2.length - 1];
-            last.textContent = last.textContent.replace("…", ev.count !== undefined ? " → " + ev.count + " 条" : " → ✓");
-          }
+          var ls = toolsBox.querySelectorAll(".tool-line");
+          if (ls.length) ls[ls.length - 1].textContent += " → " + (ev.count !== undefined ? ev.count + " 条" : "✓");
           break;
-        case "confirm":
-          loading.remove(); confirmBox.classList.remove("hidden");
-          confirmText.textContent = "⚠️ " + ev.description; sendBtn.disabled = false;
-          break;
-        case "reply": loading.remove(); addMsg("bot", ev.content, null); break;
+        case "confirm": loading.remove(); confirmBox.classList.remove("hidden");
+          confirmText.textContent = ev.description; sendBtn.disabled = false; break;
+        case "reply": loading.remove(); addMsg("bot", ev.content); break;
         case "sources":
-          var botMsgs = msgs.querySelectorAll(".chat-msg.bot");
-          if (botMsgs.length && ev.items && ev.items.length) {
-            var lastBot = botMsgs[botMsgs.length - 1];
-            var srcHtml = '<div class="chat-sources">📎 ';
-            srcHtml += ev.items.slice(0, 5).map(function (s) {
+          var bs = msgs.querySelectorAll(".cd-msg.cd-bot");
+          if (bs.length && ev.items && ev.items.length) {
+            var lb = bs[bs.length - 1].querySelector(".cd-bot-content");
+            if (lb) lb.innerHTML += '<div class="cd-sources">📎 ' + ev.items.slice(0, 5).map(function (s) {
               return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
-            }).join(" · ");
-            lastBot.innerHTML += srcHtml + "</div>";
+            }).join(" · ") + "</div>";
           }
           break;
-        case "tokens": updateTokens(ev.usage); break;
+        case "tokens":
+          if (ev.usage && ev.usage.total_tokens) {
+            totalTokens += ev.usage.total_tokens;
+            tokensBox.textContent = "本次会话 ~" + totalTokens.toLocaleString() + " tokens";
+            tokensBox.classList.remove("hidden");
+          }
+          break;
         case "done": sessionId = ev.session_id || sessionId; break;
         case "error": loading.remove(); addMsg("bot", "❌ " + ev.message); break;
       }
       msgs.scrollTop = msgs.scrollHeight;
     }
-  }
-
-  // ── 事件绑定 ──
-  sendBtn.addEventListener("click", function () { send(); });
+  };
+  sendBtn.addEventListener("click", function () { chatSend(); });
   input.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-    if (e.key === "Escape") { cmdHint.classList.add("hidden"); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chatSend(); }
   });
 
-  document.getElementById("chat-confirm-yes").addEventListener("click", function () {
-    confirmBox.classList.add("hidden"); send("是");
-  });
-  document.getElementById("chat-confirm-no").addEventListener("click", function () {
-    confirmBox.classList.add("hidden"); send("不");
-  });
-
+  // ── 其他按钮 ──
+  document.getElementById("chat-confirm-yes").addEventListener("click", function () { confirmBox.classList.add("hidden"); chatSend("是"); });
+  document.getElementById("chat-confirm-no").addEventListener("click", function () { confirmBox.classList.add("hidden"); chatSend("不"); });
   document.getElementById("chat-clear").addEventListener("click", async function () {
     if (sessionId) await fetch("/api/chat?session_id=" + encodeURIComponent(sessionId), { method: "DELETE" });
-    sessionId = ""; totalTokens = 0;
-    msgs.innerHTML = ""; toolsBox.classList.add("hidden"); confirmBox.classList.add("hidden");
+    sessionId = ""; totalTokens = 0; msgs.innerHTML = "";
+    toolsWrap.classList.add("hidden"); confirmBox.classList.add("hidden");
     suggestBox.classList.add("hidden"); tokensBox.classList.add("hidden");
     loadSuggestions();
   });
-
   document.getElementById("chat-export").addEventListener("click", async function () {
     if (!sessionId) { alert("没有可导出的对话"); return; }
     try {
-      var r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sessionId));
-      var d = await r.json();
+      var r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sessionId)); var d = await r.json();
       if (!d.messages.length) { alert("对话为空"); return; }
       var lines = ["# AI 资讯助手对话记录", ""];
-      d.messages.forEach(function (m) {
-        lines.push(m.role === "user" ? "**👤 我：**" : "**🤖 助手：**");
-        lines.push(m.content); lines.push("");
-      });
+      d.messages.forEach(function (m) { lines.push(m.role === "user" ? "**👤 我：**" : "**🤖 助手：**"); lines.push(m.content); lines.push(""); });
       var text = lines.join("\n");
       (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-        .then(function () { alert("已复制到剪贴板"); })
-        .catch(function () {
-          var ta = document.createElement("textarea");
-          ta.value = text; document.body.appendChild(ta); ta.select();
-          document.execCommand("copy"); ta.remove(); alert("已复制");
-        });
+        .then(function () { alert("已复制"); })
+        .catch(function () { var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); alert("已复制"); });
     } catch (e) { alert("导出失败"); }
   });
 
-  document.getElementById("chat-close").addEventListener("click", function () { panel.classList.add("hidden"); });
-
-  // ── 开屏：简报 + 主动建议 ──
+  // ── 开屏：建议 + 简报 ──
   fab.addEventListener("click", async function () {
-    panel.classList.remove("hidden");
-    input.focus();
-    if (!sessionId && !msgs.querySelector(".chat-msg")) {
+    open();
+    if (!sessionId && !msgs.querySelector(".cd-msg")) {
       loadSuggestions();
-      // 开屏简报
-      var briefing = document.createElement("div");
-      briefing.className = "chat-msg bot";
-      briefing.innerHTML = '<span style="color:var(--muted)">📊 正在获取今日简报…</span>';
+      var briefing = document.createElement("div"); briefing.className = "cd-msg cd-bot";
+      briefing.innerHTML = '<div class="cd-bot-label">✦ 助手</div><div class="cd-bot-content"><span style="color:var(--muted)">📊 正在获取今日简报…</span></div>';
       msgs.appendChild(briefing);
       try {
         var resp = await fetch("/api/chat/stream", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: "今日热榜前5简报，每条一句话", session_id: "" })
         });
-        var reader = resp.body.getReader();
-        var decoder = new TextDecoder();
-        var buf2 = "";
+        var reader = resp.body.getReader(); var decoder = new TextDecoder(); var buf2 = "";
         briefing.remove();
         while (true) {
-          var chunk = await reader.read();
-          if (chunk.done) break;
+          var chunk = await reader.read(); if (chunk.done) break;
           buf2 += decoder.decode(chunk.value, { stream: true });
-          var lines3 = buf2.split("\n");
-          buf2 = lines3.pop();
+          var lines3 = buf2.split("\n"); buf2 = lines3.pop();
           for (var k = 0; k < lines3.length; k++) {
-            var l = lines3[k].trim();
-            if (!l.startsWith("data: ")) continue;
+            var l = lines3[k].trim(); if (!l.startsWith("data: ")) continue;
             try {
               var ev3 = JSON.parse(l.slice(6));
               if (ev3.type === "reply") addMsg("bot", ev3.content);
