@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -527,13 +528,24 @@ def api_health():
 
 # ---------------- v0.5：Agent 对话 ----------------
 
+# session_id 是客户端自报的会话标识，会原样入库并被前端渲染；
+# 必须限字符集，防止把 HTML/JS 注入到会话列表（存储型 XSS 载体）。
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _sanitize_session_id(raw) -> str | None:
+    """不合法的 session_id 一律当新会话处理（静默降级，兼容旧前端）。"""
+    sid = str(raw or "").strip()
+    return sid if _SESSION_ID_RE.fullmatch(sid) else None
+
+
 @app.post("/api/chat")
 def api_chat(payload: dict):
     """Agent 对话（非流式，测试兼容）。"""
     message = (payload.get("message") or "").strip()
     if not message:
         return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
-    session_id = (payload.get("session_id") or "").strip() or None
+    session_id = _sanitize_session_id(payload.get("session_id"))
     result = agent_mod.run_agent(session_id, message)
     status = 200 if result.get("ok") else (400 if "设置" in result.get("message", "") or "引擎" in result.get("message", "") else 502)
     return JSONResponse(result, status_code=status)
@@ -541,26 +553,28 @@ def api_chat(payload: dict):
 
 @app.post("/api/chat/stream")
 async def api_chat_stream(payload: dict):
-    """Agent 对话（SSE 流式）：工具调用过程实时推送。"""
-    import asyncio
+    """Agent 对话（SSE 流式）：工具调用过程实时推送。
+
+    安全/可用性：run_agent_stream 是同步生成器（内含阻塞的 requests 调用），
+    必须经 iterate_in_threadpool 桥接——每个 next() 在工作线程执行，
+    事件循环保持空闲。否则单次 LLM 调用（最坏 ~170s）会让全站停摆。
+    """
     import json as _json
 
     from fastapi.responses import StreamingResponse
+    from starlette.concurrency import iterate_in_threadpool
 
     message = (payload.get("message") or "").strip()
     if not message:
         return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
-    session_id = (payload.get("session_id") or "").strip() or None
+    session_id = _sanitize_session_id(payload.get("session_id"))
     page_context = payload.get("page_context") or []
 
-    async def generate():
-        loop = asyncio.get_event_loop()
+    def event_lines():
         for event in agent_mod.run_agent_stream(session_id, message, page_context):
-            data = _json.dumps(event, ensure_ascii=False)
-            yield f"data: {data}\n\n"
-            await asyncio.sleep(0)
+            yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
 
-    return StreamingResponse(generate(), media_type="text/event-stream",
+    return StreamingResponse(iterate_in_threadpool(event_lines()), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 

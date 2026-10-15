@@ -27,11 +27,12 @@ MAX_ITERATIONS = 5
 TIMEOUT_SECONDS = 60
 TOOL_RESULT_MAX_CHARS = 2000
 HISTORY_MAX_ROUNDS = 10
+PENDING_TTL_SECONDS = 600  # 待确认写操作的有效期：超时丢弃，防"旧确认"被意外触发
 
 # 写操作工具（需要用户确认）
 WRITE_TOOLS = {"bookmark_item", "block_item", "block_source", "block_category", "add_rss_source"}
 
-# 会话存储：pending_action 保留在内存（确认流不需要跨重启），
+# 会话存储：pending_action 保留在内存（确认流不需要跨重启），带 TTL；
 # 消息历史持久化到 DB（chat_messages 表）
 _pending_actions: dict[str, dict] = {}
 
@@ -120,7 +121,7 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {
             "limit": {"type": "integer", "description": "返回条数（1-10）", "default": 5}}}}},
     {"type": "function", "function": {
-        "name": "bookmark_item", "description": "收藏或取消收藏一条新闻（用工具返回的完整 URL）",
+        "name": "bookmark_item", "description": "收藏或取消收藏一条新闻（切换语义：已收藏则取消，未收藏则收藏；用工具返回的完整 URL）",
         "parameters": {"type": "object", "properties": {
             "url": {"type": "string", "description": "新闻的完整 URL（必须与工具返回的完全一致）"}},
             "required": ["url"]}}},
@@ -216,8 +217,11 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
     session_id = session_id or str(uuid.uuid4())[:8]
     agent_start = time.time()
 
-    # 确认流：有 pending_action 且用户说"是" → 执行
+    # 确认流：有 pending_action 且用户说"是" → 执行（过期则丢弃，按新消息处理）
     pending = _pending_actions.pop(session_id, None)
+    if pending and pending.get("expires_at", 0) < time.time():
+        logger.info("[agent] pending 已过期丢弃 session=%s tool=%s", session_id, pending.get("tool"))
+        pending = None
     if pending:
         if _is_affirmative(user_message):
             logger.info("[agent] 确认执行 session=%s tool=%s args=%s", session_id, pending["tool"],
@@ -321,13 +325,19 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                 # ── 写操作确认流 ──
                 if tool_name in WRITE_TOOLS:
                     desc = _TOOL_DESCRIPTIONS.get(tool_name, tool_name)
+                    # bookmark_item 是切换语义：确认文案必须明示当前状态，
+                    # 否则"确认收藏"实际执行的是取消收藏
+                    if tool_name == "bookmark_item":
+                        already = db.is_bookmarked(str(tool_args.get("url", "")))
+                        desc = "取消收藏" if already else "收藏"
                     arg_desc = ", ".join(f"{k}={str(v)[:50]}" for k, v in tool_args.items())
                     logger.info("[agent] 请求确认 session=%s tool=%s args=%s", session_id, tool_name, arg_desc[:80])
                     yield {"type": "confirm", "action": tool_name,
                            "description": f"{desc}（{arg_desc}）",
                            "args": tool_args}
-                    # 存 pending，本轮不执行，等下一轮用户确认
-                    _pending_actions[session_id] = {"tool": tool_name, "args": tool_args}
+                    # 存 pending（带 TTL），本轮不执行，等下一轮用户确认
+                    _pending_actions[session_id] = {"tool": tool_name, "args": tool_args,
+                                                    "expires_at": time.time() + PENDING_TTL_SECONDS}
                     # 告诉 LLM 已请求确认
                     all_messages.append({"role": "tool", "tool_call_id": tc["id"],
                                          "content": json.dumps({"status": "confirming",
