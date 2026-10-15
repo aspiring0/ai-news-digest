@@ -31,8 +31,9 @@ HISTORY_MAX_ROUNDS = 10
 # 写操作工具（需要用户确认）
 WRITE_TOOLS = {"bookmark_item", "block_item", "block_source", "block_category", "add_rss_source"}
 
-# 会话存储：{session_id: {"messages": [...], "pending_action": {...}}}
-_sessions: dict[str, dict] = {}
+# 会话存储：pending_action 保留在内存（确认流不需要跨重启），
+# 消息历史持久化到 DB（chat_messages 表）
+_pending_actions: dict[str, dict] = {}
 
 AGENT_SYSTEM_PROMPT = (
     "你是「AI 资讯助手」，帮用户操控他们的 AI 资讯聚合站。\n\n"
@@ -76,7 +77,9 @@ def tool_bookmark_item(url: str) -> dict:
         state = db.toggle_bookmark(url)
         return {"ok": True, "bookmarked": state, "message": "已收藏" if state else "已取消收藏"}
     except KeyError:
-        return {"ok": False, "message": "找不到这条新闻（可能已过期被清理）"}
+        return {"ok": False,
+                "message": "找不到这条新闻（URL 可能不准确或已被 14 天清理）。"
+                           "建议：用 search_news 搜索标题关键词找到正确 URL 后重试。"}
 
 
 def tool_block_item(url: str) -> dict:
@@ -211,14 +214,11 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
         return
 
     session_id = session_id or str(uuid.uuid4())[:8]
-    session = _sessions.setdefault(session_id, {"messages": [], "pending_action": None})
-    history = session["messages"]
     agent_start = time.time()
 
     # 确认流：有 pending_action 且用户说"是" → 执行
-    if session["pending_action"]:
-        pending = session["pending_action"]
-        session["pending_action"] = None
+    pending = _pending_actions.pop(session_id, None)
+    if pending:
         if _is_affirmative(user_message):
             logger.info("[agent] 确认执行 session=%s tool=%s args=%s", session_id, pending["tool"],
                         json.dumps(pending["args"], ensure_ascii=False)[:100])
@@ -227,16 +227,16 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
             desc = _TOOL_DESCRIPTIONS.get(pending["tool"], pending["tool"])
             reply = result.get("message", "操作完成") if result.get("ok") else f"❌ {result.get('message', '失败')}"
             logger.info("[agent] 确认结果 session=%s ok=%s reply=%s", session_id, result.get("ok"), reply[:50])
-            history.append({"role": "user", "content": user_message})
-            history.append({"role": "assistant", "content": reply})
+            db.save_chat_message(session_id, "user", user_message)
+            db.save_chat_message(session_id, "assistant", reply)
             yield {"type": "reply", "content": reply}
             yield {"type": "done", "session_id": session_id}
             return
         elif _is_negative(user_message):
             logger.info("[agent] 用户取消 session=%s pending_tool=%s", session_id, pending["tool"])
-            history.append({"role": "user", "content": user_message})
+            db.save_chat_message(session_id, "user", user_message)
             reply = "好的，已取消。"
-            history.append({"role": "assistant", "content": reply})
+            db.save_chat_message(session_id, "assistant", reply)
             yield {"type": "reply", "content": reply}
             yield {"type": "done", "session_id": session_id}
             return
@@ -250,13 +250,14 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
             ctx_lines.append(f"  {item.get('n', '?')}. {item.get('title', '')} | URL: {item.get('url', '')}")
         user_content = "\n".join(ctx_lines) + f"\n\n用户说：{user_message}"
 
-    history.append({"role": "user", "content": user_content})
-    logger.info("[agent] 开始 session=%s msg=%q ctx=%d条 迭代上限=%d", session_id, user_message[:50],
+    db.save_chat_message(session_id, "user", user_content)
+    logger.info("[agent] 开始 session=%s msg=%s ctx=%d条 迭代上限=%d", session_id, user_message[:50],
                 len(page_context or []), MAX_ITERATIONS)
 
-    # 构建消息列表
+    # 从 DB 加载历史（跨重启持久）
+    db_history = db.get_chat_messages(session_id, limit=HISTORY_MAX_ROUNDS * 2)
     all_messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
-    all_messages.extend(history[-HISTORY_MAX_ROUNDS * 2:])
+    all_messages.extend({"role": m["role"], "content": m["content"]} for m in db_history)
 
     tool_calls_log: list[dict] = []
     sources_used: list[dict] = []
@@ -277,7 +278,8 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
 
             if not llm_result["tool_calls"]:
                 reply = llm_result["content"] or "抱歉，我没有得到有效回复。"
-                history.append({"role": "assistant", "content": reply})
+                db.save_chat_message(session_id, "assistant", reply,
+                                      tool_calls=json.dumps(tool_calls_log, ensure_ascii=False) if tool_calls_log else None)
                 logger.info("[agent] 完成 session=%s 总耗时=%.1fs 迭代=%d 工具调用=%d 回复长度=%d",
                             session_id, time.time() - agent_start, iteration + 1,
                             len(tool_calls_log), len(reply))
@@ -318,14 +320,13 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                            "description": f"{desc}（{arg_desc}）",
                            "args": tool_args}
                     # 存 pending，本轮不执行，等下一轮用户确认
-                    session["pending_action"] = {"tool": tool_name, "args": tool_args}
+                    _pending_actions[session_id] = {"tool": tool_name, "args": tool_args}
                     # 告诉 LLM 已请求确认
                     all_messages.append({"role": "tool", "tool_call_id": tc["id"],
                                          "content": json.dumps({"status": "confirming",
                                                                  "message": f"已向用户发送确认请求：{desc} {arg_desc}"},
                                                                 ensure_ascii=False)})
-                    history.append({"role": "assistant",
-                                    "content": f"确认要{desc}吗？（{arg_desc}）"})
+                    db.save_chat_message(session_id, "assistant", f"确认要{desc}吗？（{arg_desc}）")
                     yield {"type": "reply", "content": f"确认要{desc}吗？（{arg_desc}）"}
                     yield {"type": "done", "session_id": session_id}
                     return
@@ -359,7 +360,7 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
 
         logger.warning("[agent] 达到最大迭代 session=%s iterations=%d tools=%d", session_id, MAX_ITERATIONS, len(tool_calls_log))
         reply = "基于已有信息，我暂时无法得到更完整的答案。请尝试换一个问法。"
-        history.append({"role": "assistant", "content": reply})
+        db.save_chat_message(session_id, "assistant", reply)
         yield {"type": "reply", "content": reply}
         yield {"type": "done", "session_id": session_id}
 
@@ -461,9 +462,9 @@ def run_agent(session_id: str, user_message: str) -> dict:
 
 
 def get_history(session_id: str) -> list[dict]:
-    session = _sessions.get(session_id, {})
-    return session.get("messages", [])
+    return db.get_chat_messages(session_id)
 
 
 def clear_session(session_id: str) -> None:
-    _sessions.pop(session_id, None)
+    db.clear_chat_session(session_id)
+    _pending_actions.pop(session_id, None)
