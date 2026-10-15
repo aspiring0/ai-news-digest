@@ -533,6 +533,12 @@ function markRead(url) {
   fetch("/api/sources/health").then(function (r) { return r.json(); }).then(function (d) {
     var srcs = d.sources || {};
     var names = Object.keys(srcs);
+    /* 源名（自定义源名用户可控）与错误文本一律转义后再入 innerHTML（防存储型 XSS） */
+    function escH(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+        return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+      });
+    }
     if (!names.length) { btn.textContent = "源 —"; return; }
     var okN = names.filter(function (n) { return srcs[n].ok; }).length;
     btn.textContent = "源 " + okN + "/" + names.length;
@@ -544,9 +550,9 @@ function markRead(url) {
       var rows = names.map(function (n) {
         var s = srcs[n];
         var state = s.ok
-          ? '<span class="ok">✓ ' + s.fetched + " 条</span>"
-          : '<span class="fail">✗ ' + String(s.error || "失败").slice(0, 60) + "</span>";
-        return '<div class="health-row"><span>' + n + "</span>" + state + "</div>";
+          ? '<span class="ok">✓ ' + escH(s.fetched) + " 条</span>"
+          : '<span class="fail">✗ ' + escH(String(s.error || "失败").slice(0, 60)) + "</span>";
+        return '<div class="health-row"><span>' + escH(n) + "</span>" + state + "</div>";
       });
       panel.innerHTML = "<h4>各源最近一轮抓取</h4>" + rows.join("");
       document.body.appendChild(panel);
