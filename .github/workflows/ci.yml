@@ -19,5 +19,11 @@ jobs:
           cache: pip
       - name: 安装依赖
         run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: 依赖安全审计（pip-audit，宽松模式：未知版本不阻断，只拦实锤漏洞）
+        env:
+          PYTHONUTF8: 1  # requirements.txt 含中文注释，GBK locale 下 pip-audit 解码崩溃（实测）
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
       - name: 跑测试
         run: pytest -q

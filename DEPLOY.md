@@ -119,7 +119,9 @@ Wants=network-online.target
 Type=simple
 User=你的用户名
 WorkingDirectory=/home/你的用户名/ai-news-oss
-ExecStart=/home/你的用户名/ai-news-oss/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 默认只监听本机（与上方"安全默认"一致）。要让局域网/反代访问才改 0.0.0.0，
+# 并自行配好 nginx/caddy 访问控制——本服务无内置鉴权，模型 key 存在服务机上。
+ExecStart=/home/你的用户名/ai-news-oss/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=10
 
