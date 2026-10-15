@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -9,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 from .classifier import classify
 from .scorer import hot_score
+
+logger = logging.getLogger("ai-news-oss")  # 与其他模块同名 logger，统一日志出口
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "news.db"))
 RETENTION_DAYS = 14
@@ -227,8 +230,10 @@ def insert_items(rows: list[dict]) -> tuple[int, int]:
                             "UPDATE news_items SET summary = ? WHERE url = ? AND (summary IS NULL OR summary = '')",
                             (r["summary"], r["url"]),
                         )
-            except Exception:
+            except Exception as e:  # noqa: BLE001 - 单行坏数据不中断整批入库
                 skipped += 1
+                # 静默跳过曾让排错困难：至少留下 url 与异常原因可追查
+                logger.warning("入库失败跳过 url=%s: %s", r.get("url"), e)
     return added, skipped
 
 
