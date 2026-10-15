@@ -2,6 +2,35 @@
 
 ## 未发布
 
+功能：拆上游续批——信息源 20 → 30
+
+- **为什么**：延续"从聚合器拆直接上游"的既定方向（v0.3.3/v0.3.4 已从
+  AIHOT 拆出 9 个）：实验室/厂商动态此前依赖 newsletter 转手，拆出一手源
+  后零延迟入库；聚合器（TLDR/Rundown/TheBatch 等）保留并行——既保编辑
+  信号，也是 Anthropic/Meta/xAI 这类无 RSS 厂商的兜底通道。
+- **做了什么**：
+  - +6 平台 RSS 直连：Google Research / Microsoft Research / Azure AI /
+    Mistral / NVIDIA / MIT News AI（2026-10-15 全部探测通过，limit 15-25）。
+  - +4 无 RSS 厂商 HTML 抓取：Anthropic / Meta AI / xAI / Cohere。新增
+    `base.parse_link_page()` 通用管线，每条规则都来自实测踩坑：尾斜杠
+    归一（Meta 绝对 URL）、aria-label 优先+剥 Read 前缀（Meta 标题）、
+    同 URL 多锚点取最长可用标题（卡片/CTA 重复）、粘连清洗用词首断言
+    而非 \b（"ProgramAnnouncements" 间无词边界）、CTA 词表+slug 兜底
+    （Learn More）、页面 200 但 0 命中抛 RuntimeError 进健康面板
+    （Anthropic 两次探测结构不一致，列观察期重点）。
+  - scorer 新增 `lab` 类（68 起 -2/位，下限 50）：一手发布高于媒体 RSS、
+    低于 HF 榜单。
+  - 首抓挪后台线程：30 源顺序抓取最坏数分钟，不再阻塞服务就绪（审计
+    P2 启动阻塞，增源后放大，顺手先修）。
+- **后期补（既定方向，网络恢复后）**：arXiv（RSS 返回昨日空快照，48h
+  后重试）、HuggingFace Daily Papers（连接重置）、Stanford HAI（锚点无
+  条目）、Google blog 主站（与 Research 重叠暂缓）。
+- **代价（明示）**：每轮 +150~250 条，翻译批次（60 条/轮）会常态积压；
+  NVIDIA 混合内容靠分类器归桶。收录源跑两轮看源健康面板，不稳的一行
+  摘除（Sierra 教训）。
+- **测试**：+19（parse_link_page 全分支 ×6、RSS/HTML 源契约 ×10+parametrize、
+  lab 打分、注册表 30 源完整性、启动就绪不等待首抓）。
+
 安全修复：SSRF 防护（审计 P0-1）
 
 - **为什么**：`GET /api/summary?url=<任意>` 会让服务端抓取任意 URL（含内网/环回/

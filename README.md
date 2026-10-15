@@ -102,11 +102,26 @@ cp .env.example .env   # 不改也行，直接用默认配置
 | Vapi / Meshy / Artificial Analysis / Amazon Science / Anthropic / xAI / LangChain / Redwood / Epoch / Prime Intellect | 无公开 RSS | ⏭️ 跳过，经 AIHOT 兜底 |
 | X/Twitter 个人号、微信公众号、YouTube、播客 | 平台无 RSS（需平台 API key） | ⏭️ 按约定跳过 |
 
-单个源失败只记日志，不影响其他源。
+### 拆上游续批：+10 个一手源（聚合器保留并行，2026-10-15 探测）
+
+平台 RSS 直连（Google Research / Microsoft Research / Azure AI / Mistral / NVIDIA / MIT News AI，`lab` 打分类 68 起）+ 无 RSS 厂商 HTML 抓取（Anthropic / Meta AI / xAI / Cohere，走 `parse_link_page` 通用管线）。
+
+| 来源 | 抓取方式 | 状态 |
+|---|---|---|
+| Google Research / Microsoft Research / Azure AI / Mistral / NVIDIA / MIT News AI | 官方 RSS（limit 15-25） | ✅ 2026-10-15 探测可用 |
+| Anthropic | 官网新闻页 HTML（无 RSS） | ⚠️ 可抓但两次探测结构不一致，观察期重点 |
+| Meta AI | 官网博客 HTML（标题在 aria-label，链接带尾斜杠） | ✅ |
+| xAI | 官网新闻页 HTML（标题含描述粘连，截断展示） | ✅ |
+| Cohere | 官网博客 HTML（页面 ~1MB，limit 12） | ✅ |
+| arXiv（cs.AI/CL/LG） | RSS 返回昨日日期的空快照（三分类两协议一致） | ⏭️ **后期补**：arXiv 侧 RSS 故障，48h 后重试 |
+| HuggingFace Daily Papers | 连接重置（与 HF 源同网络问题） | ⏭️ **后期补**：网络恢复后探测 |
+| Stanford HAI / Google blog 主站 | 前者锚点无文章条目；后者与 Google Research 重叠 | ⏭️ 暂缓 |
+
+单个源失败只记日志，不影响其他源；收录源跑两轮后看设置页「源健康」面板，不稳的随时一行摘除（上批 Sierra 教训）。
 
 ## 热榜是怎么排的
 
-1. **静态分**：抓取时按源内位置一次写入——RSS 类 66 起每位 -2（不低于 48）；HuggingFace 类 72 起每位 -2（不低于 50）；ProductHunt/GitHub 类 70 起每位 -2（不低于 54）；AIHOT 采用上游分（无则按 RSS 规则 66 起步）。
+1. **静态分**：抓取时按源内位置一次写入——RSS 类 66 起每位 -2（不低于 48）；实验室/厂商一手（`lab`）类 68 起每位 -2（不低于 50）；HuggingFace 类 72 起每位 -2（不低于 50）；ProductHunt/GitHub 类 70 起每位 -2（不低于 54）；AIHOT 采用上游分（无则按 RSS 规则 66 起步）。
 2. **热榜分（实时计算，原始分不动）**：`hot_score = score × 0.5^(age_hours / 48)`，年龄按发布时间算（缺失则按入库时间）。48 小时半衰：两天前的条目热度减半，新内容自然上浮，旧"钉子户"自然下沉。
 3. **多样性配额（v0.3.2）**：热榜 top20 **每个来源最多占 4 席**——高分源（HuggingFace/GitHub 等）不再霸榜，新闻源（AIHOT/量子位等）稳定可见；只影响热榜展示，不改动数据。
 4. **故事合并（v0.3.5）**：热榜按"故事"聚合——标题共享 **≥2 个实体**且 **48 小时内**的条目视为同一事件，只占一席，显示「⧉ N 源报道」徽标（可展开看各源标题）；**故事热度 = 成员最高分 ×（1 + 15%/额外来源）**，多源交叉验证的事件自然上浮。跨语言匹配靠产品/公司名的拉丁词（"Meta 发布 Muse Wonder" ↔ "Meta releases Muse Wonder"）；纯中文实体（如"固态电池"）暂不参与合并。
@@ -117,7 +132,7 @@ cp .env.example .env   # 不改也行，直接用默认配置
 
 **方式二（写代码，适合无 RSS 的站）**：
 1. 在 `app/fetchers/` 新建一个模块（参考 `qbitai.py`，RSS 源一般 10 行就够）：
-   - 定义 `SOURCE_NAME`（显示名）、`SCORE_CLASS`（`rss` / `hf` / `ph` / `search` / `aihot`）
+   - 定义 `SOURCE_NAME`（显示名）、`SCORE_CLASS`（`rss` / `lab` / `hf` / `ph` / `search` / `aihot`）
    - 实现 `fetch() -> list[NewsItem]`（`title` / `url` / `source_name` / `published_at`）
 2. 在 `app/fetchers/__init__.py` 的 `FETCHERS` 列表里加一行。
 3. 重启服务即可。HTML 解析类源建议参考 `github_trending.py` 的写法：解析失败只记日志、不抛异常。
