@@ -1,6 +1,39 @@
 # 更新日志
 
-## 未发布
+## v0.4.3（2026-10-15）
+
+安全与加固大版本：全面工程审计后修复 P0/P1/P2 全部事项，信息源 20→30，新增 GitHub 生态页。
+
+### 安全修复
+
+- **SSRF 防护（P0-1）**：`/api/summary` 任意 URL 抓取（含内网、读取回显）+ 任意缓存删除——双层修复：端点仅站内条目（资讯库 ∪ 收藏）+ 抓取层 urlguard（scheme 白名单、IP 字面量与 DNS 解析拒绝私网/保留段、IPv6 嵌入通道复判、重定向逐跳校验 ≤3 跳）；自定义 RSS 源添加同校验；`ALLOW_PRIVATE_FETCH=1` 内网源逃生门。
+- **provider 存量 key 外发（P1-1）**：`/api/providers/models` 异址 + 空 key 曾会把已存 key 发往任意域名——回退收紧为同址才生效。
+- **XSS**：源健康面板动态值转义（P1-2d）；Agent 聊天组件 safeHref 单点收口 URL scheme、session_id 服务端白名单、画像 likes 重构为 textContent+addEventListener（P1-2a-c，feature/agent 批）。
+- 依赖安全：CI 加 pip-audit（宽松模式）；本地实测无已知漏洞。
+
+### 稳定性（P0-2 / P2）
+
+- Agent 流式端点改线程池桥接——LLM 调用（最坏 ~170s）不再阻塞整个事件循环（曾经全站停摆）。
+- SQLite 三件套：WAL + busy_timeout=5000 + 连接确定性关闭（并发写不再 database is locked）。
+- push 配置损坏回退默认（原返回 None 致 500/每轮异常）；首抓挪后台线程（服务就绪不等抓取）；确认流 10 分钟 TTL + 完整参数展示 + bookmark 切换语义明示。
+
+### 功能
+
+- **拆上游续批：信息源 20 → 30**：+6 平台 RSS（Google Research / Microsoft Research / Azure AI / Mistral / NVIDIA / MIT News AI）+ 4 无 RSS 厂商 HTML 抓取（Anthropic / Meta AI / xAI / Cohere，新增 parse_link_page 通用管线）；`lab` 打分类；聚合器保留并行（编辑信号 + 无 RSS 厂商兜底通道）。
+- **GitHub 生态独立页**：`/github` + `/api/github`（Trending / Releases / Star 飙升三源热度混排）。
+- P3 清理：入库失败日志、30 天摘要缓存过期清理、健康面板三态（ok 但 0 条标黄）、翻译回写按 URL 精确定位。
+
+### 已知事项
+
+- GitHub Actions 因账户计费锁暂停（非代码问题），CI 与 Release 自动构建待账户恢复；Windows exe 可本地 PyInstaller 构建。
+- HuggingFace 源连接重置、VentureBeat 间歇 429（网络侧）；Anthropic 源页面结构不稳，观察期。
+- 后期补源：arXiv（RSS 已恢复，接入方案设计中）、HuggingFace Daily Papers、Stanford HAI。
+
+### 测试
+
+- 97 → **209** 用例（+112）：urlguard 判定表全分支、逐跳重定向、端点允许列表、Agent 门槛、30 源注册表、启动后台化、P2/P3 全项。
+
+## v0.4.3 前的开发批次记录（原"未发布"节，按时间序）
 
 P3 清理（审计 P3 批）
 
