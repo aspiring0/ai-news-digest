@@ -113,7 +113,7 @@ cp .env.example .env   # 不改也行，直接用默认配置
 | Meta AI | 官网博客 HTML（标题在 aria-label，链接带尾斜杠） | ✅ |
 | xAI | 官网新闻页 HTML（标题含描述粘连，截断展示） | ✅ |
 | Cohere | 官网博客 HTML（页面 ~1MB，limit 12） | ✅ |
-| arXiv（cs.AI/CL/LG） | RSS 返回昨日日期的空快照（三分类两协议一致） | ⏭️ **后期补**：arXiv 侧 RSS 故障，48h 后重试 |
+| arXiv（cs.AI/CL/LG） | 官方 RSS，`paper` 低分入榜（55 起），每分类限 15 条，翻译配额排除 | ✅ 2026-10-15 RSS 恢复后接入；曾整日空快照，连续两轮 0 条需人工复查 |
 | HuggingFace Daily Papers | 连接重置（与 HF 源同网络问题） | ⏭️ **后期补**：网络恢复后探测 |
 | Stanford HAI / Google blog 主站 | 前者锚点无文章条目；后者与 Google Research 重叠 | ⏭️ 暂缓 |
 

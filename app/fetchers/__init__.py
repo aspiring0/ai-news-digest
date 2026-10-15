@@ -3,6 +3,7 @@ from . import (
     aihot,
     anthropic,
     ars_technica,
+    arxiv,
     azure_ai,
     cohere,
     deepmind,
@@ -39,8 +40,10 @@ from . import (
 # （Sierra/ARC Prize/Comfy 探测成功后即被源站限流 404，稳定性不足未收录）
 # 拆上游续批（探测 2026-10-15）：+6 平台 RSS（Google Research / MSR /
 # Azure AI / Mistral / NVIDIA / MIT）+4 无 RSS 厂商 HTML 抓取（Anthropic /
-# Meta AI / xAI / Cohere）。HF papers / arXiv / Stanford HAI 网络不可达，
-# 后期补。Anthropic 页面结构不稳定，列观察期重点。
+# Meta AI / xAI / Cohere）。HF papers / Stanford HAI 网络不可达，后期补。
+# Anthropic 页面结构不稳定，列观察期重点。
+# 论文流（2026-10-15 RSS 恢复后接入）：arXiv 三分类 paper 类低分入榜，
+# 翻译配额排除；曾整日返回空快照，空返回静默、连续两轮 0 条人工复查。
 FETCHERS = [
     aihot,
     tldr,
@@ -72,6 +75,7 @@ FETCHERS = [
     meta_ai,
     xai,
     cohere,
+    arxiv,
 ]
 
 __all__ = ["FETCHERS"]
