@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from .classifier import classify
@@ -17,16 +18,31 @@ _data_version = 0
 _hot_cache: dict = {"key": None, "ranked": None}
 
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect():
+    """连接工厂：busy_timeout + 事务（成功 commit / 异常 rollback）+ 用后必关。
+
+    原实现返回裸连接、`with sqlite3.Connection` 只 commit 不 close（回收
+    依赖 GC，审计 P2-2）；且无 busy_timeout，调度线程与请求线程并发写会
+    直接 database is locked。改造后全部 `with _connect() as conn:` 调用点
+    语义不变，额外获得 5s 忙等与确定性关闭。
+    """
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    conn.execute("PRAGMA busy_timeout = 5000")
+    try:
+        with conn:  # 成功 commit，异常 rollback
+            yield conn
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
     """建表（不存在则建）。"""
     with _connect() as conn:
+        # WAL：库级持久属性，一次设置即可（读写不互斥，写入方并发更稳）
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS news_items (

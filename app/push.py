@@ -20,16 +20,22 @@ CHANNELS = ("off", "telegram", "wecom", "feishu", "webhook")
 TIMEOUT = 15
 
 
+DEFAULT_CONFIG: dict = {"enabled": False, "channel": "off", "telegram_token": "", "telegram_chat": "",
+                       "wecom_key": "", "feishu_url": "", "webhook_url": "",
+                       "base_url": "http://localhost:8000/hot", "top_n": 5}
+
+
 def get_config() -> dict:
     raw = db.get_meta(CONFIG_KEY)
     if not raw:
-        return {"enabled": False, "channel": "off", "telegram_token": "", "telegram_chat": "",
-                "wecom_key": "", "feishu_url": "", "webhook_url": "", "base_url": "http://localhost:8000/hot",
-                "top_n": 5}
+        return dict(DEFAULT_CONFIG)
     try:
         cfg = json.loads(raw)
     except ValueError:
-        return get_config.__defaults__  # 不会走到；防御
+        # 配置损坏（手改/写坏）：回退默认而不是返回 None——
+        # 旧行为会让 /api/quest 500、notify_round 每轮 AttributeError（审计 P2-1）
+        logger.warning("推送配置损坏，已回退默认（channel=off）")
+        return dict(DEFAULT_CONFIG)
     cfg.setdefault("enabled", False)
     cfg.setdefault("channel", "off")
     return cfg
