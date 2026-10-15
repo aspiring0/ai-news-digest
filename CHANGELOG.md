@@ -2,6 +2,24 @@
 
 ## 未发布
 
+加固（审计 P2 批）
+
+- **为什么**：① push 配置损坏时 `get_config` 返回 None（`__defaults__` 误用，
+  审计已动态验证：`/api/push` 500、每轮推送 AttributeError 被吞）；② SQLite
+  无 busy_timeout/WAL、连接靠 GC 回收——调度线程与请求线程并发写有
+  database is locked 风险；③ DEPLOY.md systemd 示例 `--host 0.0.0.0` 与同页
+  安全警示自相矛盾；④ 依赖 CVE 无闭环（审计标注"未验证"）。
+- **做了什么**：
+  - push：损坏 JSON 回退 `DEFAULT_CONFIG` 副本（channel=off），端点与
+    notify_round 均不再炸。
+  - SQLite 三件套：`_connect` 改造为 contextmanager（busy_timeout=5000、
+    with 退出确定性 close、异常 rollback），init_db 一次性 WAL（库级持久）；
+    ~50 处调用点零改动。`.gitignore` 补 `*.db-wal`/`*.db-shm`。
+  - DEPLOY.md：systemd 示例改 `127.0.0.1` + 注释说明何时才该 0.0.0.0。
+  - CI：新增 pip-audit 步骤（宽松模式——不加 `--strict`，版本时间线较新，
+    查不到的版本不阻断，只拦实锤漏洞）。
+- **测试**：+7（损坏回退 ×3、busy_timeout/close/WAL/异常回滚 ×4）。
+
 功能：拆上游续批——信息源 20 → 30
 
 - **为什么**：延续"从聚合器拆直接上游"的既定方向（v0.3.3/v0.3.4 已从
