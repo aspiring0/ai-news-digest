@@ -89,6 +89,35 @@ def test_translate_handles_llm_failure(clean_db, monkeypatch):
         assert r["title_cn"] is None, "失败时保持空，下轮重试"
 
 
+def test_translate_same_title_updates_only_mapped_url(clean_db, monkeypatch):
+    """P3：同标题不同 URL 的两行，翻译回写只落在映射到的 URL 上。
+
+    旧行为 UPDATE ... WHERE title=? 会把两行同标题行一起改写（误伤）。
+    现在 SELECT 保留 url 并构建 title→url 映射（字典后写覆盖前写：行序
+    按 COALESCE(published_at, fetched_at) DESC，映射最终落在较早发布的
+    那行），UPDATE 按 url 精确定位；未映射到的行保持空，下一轮重试。
+    """
+    title = "Same English Headline Published Twice"
+    db.insert_items([
+        {"url": "https://dup/new", "title": title, "source_name": "源A",
+         "published_at": _now() - timedelta(hours=1), "fetched_at": _now(), "score": 60.0},
+        {"url": "https://dup/old", "title": title, "source_name": "源B",
+         "published_at": _now() - timedelta(hours=2), "fetched_at": _now(), "score": 60.0},
+    ])
+
+    import app.translator as tr
+
+    monkeypatch.setattr(tr, "_call_llm_translate", lambda titles: {title: ("中文标题", "中文描述")})
+    tr.translate_untranslated()
+
+    with db._connect() as conn:
+        new = conn.execute("SELECT title_cn FROM news_items WHERE url='https://dup/new'").fetchone()
+        old = conn.execute("SELECT title_cn, description_cn FROM news_items WHERE url='https://dup/old'").fetchone()
+    assert old["title_cn"] == "中文标题", "映射到的 url 行应被更新"
+    assert old["description_cn"] == "中文描述"
+    assert new["title_cn"] is None, "同标题的另一行不应被误伤"
+
+
 # ---------------- 前端展示 ----------------
 
 def test_hot_page_shows_chinese_title(client, monkeypatch):

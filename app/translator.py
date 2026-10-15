@@ -87,7 +87,12 @@ def _call_llm_translate(titles: list[str]) -> dict[str, tuple[str, str]]:
 
 
 def translate_untranslated(limit: int = 60) -> int:
-    """找出未翻译的英文条目，批量翻译写入。返回翻译条数。"""
+    """找出未翻译的英文条目，批量翻译写入。返回翻译条数。
+
+    回写按 url 精确定位（P3）：同标题不同 URL 的多行存在时，按标题
+    UPDATE 会误伤所有同标题行；这里用 title→url 映射回写映射到的那行，
+    其余行保持空、下一轮重试。LLM 协议不变（仍按 title 对键）。
+    """
     with db._connect() as conn:
         rows = conn.execute(
             "SELECT url, title FROM news_items"
@@ -96,7 +101,8 @@ def translate_untranslated(limit: int = 60) -> int:
             (limit,),
         ).fetchall()
 
-    pending = [r["title"] for r in rows if _needs_translation(r["title"])]
+    title_url = {r["title"]: r["url"] for r in rows}
+    pending = [t for t in title_url if _needs_translation(t)]
     if not pending:
         return 0
 
@@ -111,12 +117,15 @@ def translate_untranslated(limit: int = 60) -> int:
             break
         with db._connect() as conn:
             for title, (t_cn, d_cn) in results.items():
-                if t_cn:
-                    conn.execute(
-                        "UPDATE news_items SET title_cn = ?, description_cn = ? WHERE title = ? AND (title_cn IS NULL OR title_cn = '')",
-                        (t_cn, d_cn or None, title),
-                    )
-                    translated += 1
+                url = title_url.get(title)
+                if not t_cn or not url:
+                    continue  # 映射缺失则跳过（防御：LLM 返回的键不在待译集）
+                conn.execute(
+                    "UPDATE news_items SET title_cn = ?, description_cn = ?"
+                    " WHERE url = ? AND (title_cn IS NULL OR title_cn = '')",
+                    (t_cn, d_cn or None, url),
+                )
+                translated += 1
     if translated:
         logger.info("批量翻译：%d 条英文标题已配中文", translated)
     return translated
