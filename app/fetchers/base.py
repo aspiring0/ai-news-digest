@@ -98,6 +98,12 @@ _GLUED_MONTH_RE = re.compile(
     r"(?<=([a-z\u4e00-\u9fff]))(?=(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s\d)"
 )
 _MIN_READ_RE = re.compile(r"\s?\d+\s?min(ute)?s?\s?read.*$", re.IGNORECASE)
+# 前缀形态（观察期第一轮实测新增）：卡片锚文本把 日期/分类词/junk 放在标题前
+_LEAD_DATE_RE = re.compile(r"^\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4}\s*")
+_LEAD_CATEGORY_RE = re.compile(r"^(Announcements?|Research|Company|Engineering|Policy|Events)(?=[A-Z])\s*")
+_LEAD_JUNK_RE = re.compile(r"^(full article|read article|view article)\s*[:：]\s*", re.IGNORECASE)
+# 「分类·日期」复合前缀："Product·Oct 12, 2026Introducing…"（xAI 实测形态）
+_LEAD_TAG_DOT_RE = re.compile(r"^[A-Za-z]{2,12}\s*·\s*")
 
 
 def _slug_title(url: str) -> str:
@@ -108,9 +114,14 @@ def _slug_title(url: str) -> str:
 
 
 def _clean_anchor_text(text: str) -> str:
-    """清洗卡片锚文本：去粘连的分类词/月名日期/阅读时长。"""
+    """清洗卡片锚文本：剥前缀（junk/分类·日期/日期/分类词）+ 去后缀粘连（分类词/月名日期/阅读时长）。"""
     t = " ".join(text.split())
     t = _MIN_READ_RE.sub("", t)
+    for _ in range(3):  # 复合前缀可叠加（"Product·Oct 12, 2026标题…"）
+        t = _LEAD_JUNK_RE.sub("", t)
+        t = _LEAD_TAG_DOT_RE.sub("", t)
+        t = _LEAD_DATE_RE.sub("", t)
+        t = _LEAD_CATEGORY_RE.sub("", t)
     for pat in (_GLUED_CATEGORY_RE, _GLUED_MONTH_RE):
         m = pat.search(t)
         if m:
@@ -119,12 +130,15 @@ def _clean_anchor_text(text: str) -> str:
 
 
 def _anchor_title(a) -> str:
-    """单个锚点的候选标题：aria-label（剥 Read 前缀）→ 清洗后的锚文本。"""
+    """单个锚点的候选标题：aria-label（剥 Read 前缀）→ 清洗后的锚文本。
+
+    aria-label 同样过清洗：Cohere 的标签自带 "full article:" 前缀（实测）。
+    """
     label = " ".join((a.get("aria-label") or "").split())
     if label.lower().startswith("read "):
         label = label[5:]
     if label:
-        return label
+        return _clean_anchor_text(label)
     return _clean_anchor_text(a.text_content() or "")
 
 

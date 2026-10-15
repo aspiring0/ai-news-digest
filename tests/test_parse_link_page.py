@@ -16,7 +16,9 @@ def _mock_page(monkeypatch, html: str):
 
         @property
         def content(self):
-            return html.encode("utf-8")
+            # 补 charset 声明：lxml 对无声明字节按 latin-1 解析，· 会变 Â·
+            # （真实站点都有声明，四源实测通过；此处模拟真实响应）
+            return ('<meta charset="utf-8">' + html).encode("utf-8")
 
     monkeypatch.setattr(base.requests, "get", lambda url, **kw: _Resp())
 
@@ -55,6 +57,34 @@ def test_glued_category_and_month_cut(monkeypatch):
     # 普通空格分隔的阅读时长也剥掉，标题本体保留
     assert by["https://www.anthropic.com/blog/multilingual"] == \
         "Multilingual Bridges: How Data Mixing Unlocks Reasoning"
+
+
+# ── 2b. 前缀形态（观察期第一轮实测：日期/分类/junk 在标题前） ──
+
+def test_lead_prefixes_stripped(monkeypatch):
+    _mock_page(monkeypatch, """
+    <html><body>
+    <a href="/news/cyber-2">Oct 6, 2026AnnouncementsExpanding the Cyber Verification Program again</a>
+    <a href="/news/grok-voice">Oct 14, 2026Introducing Grok Voice 3.0 for everyone</a>
+    <a href="/blog/north-2">full article: North 2: Enterprise AI without compromise</a>
+    <a href="/news/x-sub">Product\u00b7Oct 12, 2026Introducing The X Subscription tier</a>
+    </body></html>""")
+    items = parse_link_page("https://x.ai/news", "xAI", r"^/(news|blog)/[a-z0-9-]+$", limit=5)
+    by = {i.url: i.title for i in items}
+    assert by["https://x.ai/news/cyber-2"] == "Expanding the Cyber Verification Program again"
+    assert by["https://x.ai/news/grok-voice"] == "Introducing Grok Voice 3.0 for everyone"
+    assert by["https://x.ai/blog/north-2"] == "North 2: Enterprise AI without compromise"
+    assert by["https://x.ai/news/x-sub"] == "Introducing The X Subscription tier"
+
+
+def test_aria_label_also_cleaned(monkeypatch):
+    """aria-label 自带 junk 前缀（Cohere 实测形态）也要清洗。"""
+    _mock_page(monkeypatch, """
+    <html><body>
+    <a aria-label="full article: North 2 Enterprise AI" href="/blog/n2/">
+    </body></html>""")
+    items = parse_link_page("https://cohere.com/blog", "Cohere", r"^/blog/[a-z0-9-]+$", limit=5)
+    assert items[0].title == "North 2 Enterprise AI"
 
 
 # ── 3. 同 URL 多锚点：标题锚 + CTA 锚，取最长可用标题 ──
