@@ -549,9 +549,15 @@ function markRead(url) {
       panel.className = "health-panel";
       var rows = names.map(function (n) {
         var s = srcs[n];
-        var state = s.ok
-          ? '<span class="ok">✓ ' + escH(s.fetched) + " 条</span>"
-          : '<span class="fail">✗ ' + escH(String(s.error || "失败").slice(0, 60)) + "</span>";
+        /* 三态：✓ 有条数（绿）/ ok 但 0 条（黄 ⚠——失败被源内部捕获后返回空列表，绿色会掩盖问题）/ ✗ 失败 */
+        var state;
+        if (!s.ok) {
+          state = '<span class="fail">✗ ' + escH(String(s.error || "失败").slice(0, 60)) + "</span>";
+        } else if (Number(s.fetched) > 0) {
+          state = '<span class="ok">✓ ' + escH(s.fetched) + " 条</span>";
+        } else {
+          state = '<span class="ok" style="color:var(--amber-text)">⚠ 0 条</span>';
+        }
         return '<div class="health-row"><span>' + escH(n) + "</span>" + state + "</div>";
       });
       panel.innerHTML = "<h4>各源最近一轮抓取</h4>" + rows.join("");

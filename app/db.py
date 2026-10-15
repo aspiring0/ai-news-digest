@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -9,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 from .classifier import classify
 from .scorer import hot_score
+
+logger = logging.getLogger("ai-news-oss")  # 与其他模块同名 logger，统一日志出口
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "news.db"))
 RETENTION_DAYS = 14
@@ -227,8 +230,10 @@ def insert_items(rows: list[dict]) -> tuple[int, int]:
                             "UPDATE news_items SET summary = ? WHERE url = ? AND (summary IS NULL OR summary = '')",
                             (r["summary"], r["url"]),
                         )
-            except Exception:
+            except Exception as e:  # noqa: BLE001 - 单行坏数据不中断整批入库
                 skipped += 1
+                # 静默跳过曾让排错困难：至少留下 url 与异常原因可追查
+                logger.warning("入库失败跳过 url=%s: %s", r.get("url"), e)
     return added, skipped
 
 
@@ -609,3 +614,11 @@ def delete_summary(url: str) -> None:
     """清除某 URL 的摘要缓存（重新生成前调用）。"""
     with _connect() as conn:
         conn.execute("DELETE FROM summary_cache WHERE url = ?", (url,))
+
+
+def clear_stale_summaries(days: int = 30) -> int:
+    """删除 N 天前的摘要缓存（孤儿缓存随时间清理；30 天而非 14 天——书签页的过期条目仍可能命中旧缓存）。"""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM summary_cache WHERE created_at < ?", (cutoff,))
+        return cur.rowcount

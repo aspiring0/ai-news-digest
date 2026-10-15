@@ -71,6 +71,7 @@ def run_once() -> dict:
 
     added, skipped = db.insert_items(rows)
     deleted = db.cleanup()
+    stale_cached = db.clear_stale_summaries()  # P3：孤儿摘要缓存随时间回收
     db.set_meta("last_fetch_run", now.isoformat())  # v0.3：健康检查用
     db.set_meta(
         "source_health",
@@ -78,6 +79,7 @@ def run_once() -> dict:
     )
     summary["_total"] = {"added": added, "skipped": skipped, "cleaned": deleted}
     logger.info("入库：新增 %d，跳过 %d，清理 14 天前 %d", added, skipped, deleted)
+    logger.info("清理 30 天前摘要缓存 %d 条", stale_cached)
     _notify_push()
 
     # v0.5：抓取后批量翻译英文标题为中文（失败不阻塞）

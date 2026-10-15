@@ -2,6 +2,32 @@
 
 ## 未发布
 
+P3 清理（审计 P3 批）
+
+- **为什么**：① insert_items 吞异常完全静默——坏行只留下 skipped+1，
+  排错靠猜（此前测试排错已实际踩坑）；② summary_cache 只增不减，
+  条目 14 天清理后缓存成孤儿永久留存；③ 健康面板对"ok 但 0 条"的源
+  显示绿色 ✓，源失败被内部捕获后返回空列表的问题被掩盖；④ 批量翻译
+  回写按 title 定位，同标题不同 URL 的多行会被误伤。
+- **做了什么**：
+  - db：insert_items 的 except 分支保留 skipped 计数，同时记
+    `logger.warning("入库失败跳过 url=%s: %s")`（db.py 补同名 logger
+    `ai-news-oss`，与其他模块统一日志出口）；新增
+    `clear_stale_summaries(days=30)` 按 created_at 清理过期摘要缓存，
+    run_once 在 14 天清理之后调用并记日志（30 天而非 14 天——书签页
+    的过期条目仍可能命中旧缓存）。
+  - 健康面板三态：`!ok` 红 ✗ / `ok 且 fetched>0` 绿 ✓ N 条 /
+    `ok 且 0 条` 黄 ⚠ 0 条（复用现有 `--amber-text` 变量，深浅色主题
+    都有定义）；动态值仍全部经 escH 转义。
+  - 翻译回写按 url：SELECT 构建 title→url 映射，UPDATE 改
+    `WHERE url=?`（title_cn 为空的守卫保留），映射缺失跳过；
+    `_call_llm_translate` 协议不变，pending 顺带去重。
+- **测试**：+5（入库失败日志 / 缓存旧删新留 / run_once 接线 / 健康面板
+  ⚠ 契约 / 同标题仅映射行更新）。204 → 209 passed。
+  备注：入库失败日志用"缺 score 键"的行触发 try 内 KeyError——
+  INSERT OR IGNORE 会把 NOT NULL 违例也吞掉（走 rowcount=0 跳过路径，
+  不进 except），缺 fetched_at 的行触发不了该分支。
+
 功能：GitHub 生态独立页
 
 - **为什么**：GitHub 类内容（Trending / Releases / Star 飙升）此前混排在
