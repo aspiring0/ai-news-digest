@@ -129,6 +129,47 @@ def timeline(request: Request, page: int = 1):
     )
 
 
+# ---------------- GitHub 生态独立视图（Trending / Releases / Star 飙升） ----------------
+
+GITHUB_SOURCES = ("GitHub Trending", "GitHub Releases", "Star 飙升")
+
+
+def _github_items(page: int, per_page: int) -> tuple[list[dict], int]:
+    """三源混排按 hot_score 倒序 + 屏蔽过滤 + 收藏标记，分页返回。"""
+    marks = ",".join("?" * len(GITHUB_SOURCES))
+    with db._connect() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM news_items WHERE source_name IN ({marks})", GITHUB_SOURCES
+        ).fetchall()
+    items = db._filter_blocked([db._row_to_dict(r) for r in rows])
+    items.sort(key=lambda x: x["hot_score"], reverse=True)
+    total = len(items)
+    start = (max(1, page) - 1) * per_page
+    return _mark_bookmarks(items[start:start + per_page]), total
+
+
+@app.get("/github")
+def github_page(request: Request, page: int = 1):
+    """GitHub 生态独立页：仓库趋势 / 版本发布 / Star 飙升按热度混排。"""
+    page = max(1, page)
+    items, total = _github_items(page, PER_PAGE)
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    return templates.TemplateResponse(
+        request,
+        "github.html",
+        {"items": items, "page": page, "total_pages": total_pages, "total": total},
+    )
+
+
+@app.get("/api/github")
+def api_github(page: int = 1):
+    """GitHub 生态条目（JSON）：与时间线同构 {items, total, page, total_pages}。"""
+    page = max(1, page)
+    items, total = _github_items(page, PER_PAGE)
+    total_pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    return {"ok": True, "items": items, "total": total, "page": page, "total_pages": total_pages}
+
+
 @app.get("/bookmarks")
 def bookmarks_page(request: Request):
     items = db.get_bookmarks()

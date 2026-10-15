@@ -50,7 +50,7 @@ curl http://localhost:8000/api/health
 
 - `news_count` 为 0：首次抓取还没完成（约几十秒），等一两分钟再查
 - `last_fetch` 为 null：抓取尚未成功跑完一轮，检查日志
-- 页面：`/hot` 热榜、`/timeline` 时间线、`/settings` 设置页
+- 页面：`/hot` 热榜、`/timeline` 时间线、`/github` GitHub 生态、`/settings` 设置页
 
 ## 常见坑
 
