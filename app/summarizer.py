@@ -6,16 +6,50 @@ from __future__ import annotations
 
 import json
 import logging
+from urllib.parse import urljoin, urlparse
 
 import requests
 
 from . import db
 from .fetchers.base import FETCH_TIMEOUT, HEADERS
 from .providers import chat_url
+from .urlguard import check_url
 
 logger = logging.getLogger("ai-news-oss")
 
 MAX_CHARS = 6000  # 正文截断长度
+MAX_REDIRECTS = 3  # 手动跟随重定向的跳数上限（逐跳过 urlguard）
+
+
+class _BlockedURLError(Exception):
+    """URL 被 urlguard 拒绝（内网/保留网段/非法格式）。按正文抓取失败处理。"""
+
+
+def _loggable(url: str) -> str:
+    """日志里只记 scheme+host，避免 query 串中的 token 落盘。"""
+    p = urlparse(url)
+    return f"{p.scheme}://{p.hostname}"
+
+
+def _safe_get(url: str, depth: int = 0) -> requests.Response:
+    """安全 GET：抓取前过 urlguard；重定向手动逐跳跟随，每一跳重新校验。
+
+    requests 默认自动跟随重定向，公网 URL 302 到内网的绕过面由此封死。
+    """
+    if depth > MAX_REDIRECTS:
+        raise _BlockedURLError(f"重定向超过 {MAX_REDIRECTS} 跳")
+    ok, reason = check_url(url)
+    if not ok:
+        logger.warning("[urlguard] 拒绝抓取 %s: %s", _loggable(url), reason)
+        raise _BlockedURLError(reason)
+    resp = requests.get(url, headers=HEADERS, timeout=FETCH_TIMEOUT, allow_redirects=False)
+    if resp.status_code in (301, 302, 303, 307, 308):
+        location = resp.headers.get("Location")
+        resp.close()  # 释放中间跳的连接
+        if not location:
+            raise _BlockedURLError("重定向响应缺少 Location")
+        return _safe_get(urljoin(url, location), depth + 1)
+    return resp
 
 SYSTEM_PROMPT = (
     "你是中文资讯解读助手。请用简体中文输出严格的 JSON（只输出 JSON，不要其他文字），"
@@ -55,9 +89,12 @@ def _extract_with_readability(html: str, url: str) -> str | None:
 def fetch_article_text(url: str, rss_summary: str = "") -> str | None:
     """抓正文：trafilatura → readability → RSS 摘要兜底。返回截断后的文本或 None。"""
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=FETCH_TIMEOUT)
+        resp = _safe_get(url)
         resp.raise_for_status()
         html = resp.text
+    except _BlockedURLError as e:
+        logger.warning("正文抓取被安全策略拒绝 %s: %s", _loggable(url), e)
+        html = ""
     except Exception as e:  # noqa: BLE001
         logger.warning("正文抓取失败 %s: %s", url, e)
         html = ""
