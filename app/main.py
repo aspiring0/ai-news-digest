@@ -189,7 +189,17 @@ def topics(request: Request):
 
 @app.get("/api/summary")
 def api_summary(request: Request, url: str, regenerate: int = 0):
-    """摘要：先查缓存；没有则走"抓正文→调模型→缓存"全链路。regenerate=1 强制重新生成。"""
+    """摘要：先查缓存；没有则走"抓正文→调模型→缓存"全链路。regenerate=1 强制重新生成。
+
+    安全：仅支持站内条目（资讯库或收藏中的 URL）——防止把服务端当代理
+    抓任意 URL（SSRF，含内网）；regenerate 的缓存删除也只对站内条目生效。
+    """
+    url = url.strip()
+    if not db.is_known_url(url):
+        return JSONResponse(
+            {"ok": False, "message": "仅支持对站内条目生成摘要（该链接不在资讯库或收藏中）"},
+            status_code=400,
+        )
     if regenerate:
         db.delete_summary(url)
     # 找标题与 RSS 摘要（正文抓取失败时兜底，v0.3.6）

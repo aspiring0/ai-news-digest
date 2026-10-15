@@ -384,6 +384,19 @@ def get_meta(key: str) -> str | None:
 
 # ---------------- v0.2：收藏 ----------------
 
+def is_known_url(url: str) -> bool:
+    """URL 是否属于站内已知条目（资讯库或收藏）。
+
+    /api/summary 的允许列表：只对站内条目生成摘要，封掉任意 URL 的
+    服务端抓取（SSRF）。注意不含 summary_cache——升级前可能已缓存的
+    内网读取内容不能经旧缓存重新外泄。
+    """
+    with _connect() as conn:
+        in_news = conn.execute("SELECT 1 FROM news_items WHERE url = ?", (url,)).fetchone()
+        in_marks = conn.execute("SELECT 1 FROM bookmarks WHERE url = ?", (url,)).fetchone()
+    return bool(in_news or in_marks)
+
+
 def toggle_bookmark(url: str) -> bool:
     """收藏/取消收藏。收藏时抓正文快照（原文失效后仍可读）。返回 True=已收藏。"""
     with _connect() as conn:
@@ -446,12 +459,19 @@ def list_custom_sources() -> list[dict]:
 def add_custom_source(name: str, url: str) -> None:
     from urllib.parse import urlparse
 
+    from .urlguard import check_url
+
     name = (name or "").strip()
     url = (url or "").strip()
     if not name:
         raise ValueError("名称不能为空")
     if not url.startswith(("http://", "https://")) or not urlparse(url).hostname:
         raise ValueError("RSS 地址必须是合法的 http(s) URL")
+    # SSRF 防护：源地址不得解析到内网/保留网段（服务端会周期性抓取它）。
+    # 域名解析失败同样拒绝——反正永远抓不到，提前报错优于入列表后每轮失败。
+    ok, reason = check_url(url)
+    if not ok:
+        raise ValueError(f"RSS 地址不允许（{reason}）；确需内网源请设置 ALLOW_PRIVATE_FETCH=1")
     try:
         with _connect() as conn:
             conn.execute(
