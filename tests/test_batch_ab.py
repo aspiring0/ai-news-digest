@@ -2,8 +2,16 @@
 from __future__ import annotations
 
 import json
+import socket
 
 from app import db
+
+
+def _pub_dns(monkeypatch):
+    """把 DNS mock 成公网解析（add_custom_source 走 urlguard，测试环境不真解析）。"""
+    def fake(host, port=None):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
 
 
 # ---------------- 收藏正文快照 ----------------
@@ -38,7 +46,8 @@ def test_bookmark_snapshot_fallback_to_rss(clean_db, monkeypatch):
 
 # ---------------- 自定义 RSS 源 ----------------
 
-def test_custom_sources_crud(clean_db):
+def test_custom_sources_crud(clean_db, monkeypatch):
+    _pub_dns(monkeypatch)
     db.add_custom_source("我的博客", "https://blog.example/feed")
     db.add_custom_source("某社区", "https://c.example/rss")
     # URL 去重
@@ -55,6 +64,7 @@ def test_custom_sources_crud(clean_db):
 
 def test_run_once_fetches_custom_sources(clean_db, monkeypatch):
     """自定义源参与抓取轮（走 parse_rss，按 rss 规则打分）。"""
+    _pub_dns(monkeypatch)
     db.add_custom_source("我的博客", "https://blog.example/feed")
     from datetime import datetime, timezone
     from app.fetchers.base import NewsItem
@@ -73,7 +83,8 @@ def test_run_once_fetches_custom_sources(clean_db, monkeypatch):
     assert n == 1
 
 
-def test_api_custom_sources(client):
+def test_api_custom_sources(client, monkeypatch):
+    _pub_dns(monkeypatch)
     r = client.post("/api/custom-sources", json={"name": "测试源", "url": "https://t.example/feed"})
     assert r.status_code == 200
     lst = client.get("/api/custom-sources").json()
