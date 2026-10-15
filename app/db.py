@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -342,11 +343,39 @@ def _compute_ranked_stories(profile: dict | None, max_per_source: int = 4) -> li
     return ranked
 
 
+_CJK_QUERY_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _search_cjk(q: str, limit: int) -> list[dict]:
+    """中文（含 CJK 的混合）查询：LIKE 子串路径。
+
+    为什么不走 FTS：FTS5 默认 unicode61 分词器把整段连续中文当作一个
+    token，子串查询（"翻译"匹配"…翻译功能…"）基本搜不到——不止 title_cn
+    缺索引，中文查询在 FTS 路径上本就失效。LIKE 覆盖 title/title_cn/
+    summary 三列（ASCII 大小写不敏感），当前量级（万级行）性能足够。
+    """
+    esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    like = f"%{esc}%"
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM news_items"
+            " WHERE title LIKE ? ESCAPE '\\' OR title_cn LIKE ? ESCAPE '\\'"
+            " OR summary LIKE ? ESCAPE '\\' LIMIT ?",
+            (like, like, like, limit),
+        ).fetchall()
+    items = [_row_to_dict(r) for r in rows]
+    items.sort(key=lambda x: x["hot_score"], reverse=True)
+    return items
+
+
 def search_items(q: str, limit: int = 50) -> list[dict]:
-    """全文搜索（标题/来源/RSS 摘要，FTS5 短语+前缀匹配）。输入做转义，FTS 语法字符不炸。"""
+    """搜索：含 CJK 走 LIKE 子串（中文分词限制，见 _search_cjk）；纯英文走
+    FTS5 短语+前缀匹配（输入做转义，FTS 语法字符不炸）。均按热度排序。"""
     q = (q or "").strip()
     if not q:
         return []
+    if _CJK_QUERY_RE.search(q):
+        return _search_cjk(q, limit)
     safe = '"' + q.replace('"', '""') + '"*'
     try:
         with _connect() as conn:

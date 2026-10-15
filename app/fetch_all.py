@@ -77,6 +77,9 @@ def run_once() -> dict:
         "source_health",
         json.dumps({k: v for k, v in summary.items() if not k.startswith("_")}, ensure_ascii=False),
     )
+    streaks, alerts = _evaluate_source_alerts(summary)  # B1：连续异常告警（函数内自持久化）
+    if alerts:
+        _notify_source_alerts(alerts)
     summary["_total"] = {"added": added, "skipped": skipped, "cleaned": deleted}
     logger.info("入库：新增 %d，跳过 %d，清理 14 天前 %d", added, skipped, deleted)
     logger.info("清理 30 天前摘要缓存 %d 条", stale_cached)
@@ -90,6 +93,50 @@ def run_once() -> dict:
         logger.warning("批量翻译失败（下轮重试）: %s", e)
 
     return summary
+
+
+# ---------------- B1：源健康连续异常告警 ----------------
+
+FAIL_STREAK_ALERT_THRESHOLD = 3  # 连续 N 轮异常触发一次告警（每个异常期只报一次）
+
+
+def _evaluate_source_alerts(summary: dict) -> tuple[dict, list[str]]:
+    """按本轮结果更新各源连续异常计数并持久化到 meta（重启不清零）。
+
+    异常定义：ok=False（真失败）或 ok=True 但 fetched=0（失败被源内
+    部捕获后返回空列表，健康面板黄 ⚠ 那一类）。达到阈值生成一条告警
+    文本；恢复（本轮正常）清零。
+    """
+    streaks = json.loads(db.get_meta("source_fail_streaks") or "{}")
+    alerts: list[str] = []
+    for name, info in summary.items():
+        if name.startswith("_") or not isinstance(info, dict):
+            continue
+        bad = (not info.get("ok")) or info.get("fetched", 0) == 0
+        streaks[name] = streaks.get(name, 0) + 1 if bad else 0
+        if bad and streaks[name] == FAIL_STREAK_ALERT_THRESHOLD:
+            state = "抓取失败" if not info.get("ok") else "0 条（疑似被吞的失败）"
+            alerts.append(f"源「{name}」连续 {FAIL_STREAK_ALERT_THRESHOLD} 轮{state}"
+                          f"：{str(info.get('error') or '无错误详情')[:60]}")
+    db.set_meta("source_fail_streaks", json.dumps(streaks, ensure_ascii=False))
+    return streaks, alerts
+
+
+def _notify_source_alerts(alerts: list[str]) -> None:
+    """告警出口：推送渠道已启用则推送，否则降级 WARNING 日志（/api/logs 可见）。"""
+    text = "⚠ 源健康告警\n" + "\n".join(alerts)
+    try:
+        from .push import get_config, send
+
+        cfg = get_config()
+        if cfg.get("enabled") and cfg.get("channel") != "off":
+            result = send(text, cfg)
+            logger.warning("源健康告警已推送（%s）：%s", cfg["channel"],
+                           "；".join(alerts)[:120] if result.get("ok") else result.get("message"))
+            return
+    except Exception as e:  # noqa: BLE001 - 告警失败不影响抓取
+        logger.warning("源健康告警推送异常: %s", e)
+    logger.warning("源健康告警（未启用推送，仅日志）：%s", "；".join(alerts)[:200])
 
 
 def _notify_push() -> None:
