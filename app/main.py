@@ -564,6 +564,12 @@ async def api_chat_stream(payload: dict):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@app.get("/api/chat/sessions")
+def api_chat_sessions():
+    """列出最近活跃的聊天会话。"""
+    return {"ok": True, "sessions": db.list_chat_sessions()}
+
+
 @app.get("/api/chat/history")
 def api_chat_history(session_id: str = ""):
     return {"ok": True, "messages": agent_mod.get_history(session_id)}

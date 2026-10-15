@@ -261,6 +261,7 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
 
     tool_calls_log: list[dict] = []
     sources_used: list[dict] = []
+    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     start = time.time()
 
     try:
@@ -272,6 +273,10 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
             llm_start = time.time()
             llm_result = _call_llm(provider, all_messages, TOOL_SCHEMAS)
             llm_ms = int((time.time() - llm_start) * 1000)
+            u = llm_result.get("usage") or {}
+            total_usage["prompt_tokens"] += u.get("prompt_tokens", 0)
+            total_usage["completion_tokens"] += u.get("completion_tokens", 0)
+            total_usage["total_tokens"] += u.get("total_tokens", 0)
             logger.info("[agent] LLM调用 session=%s iter=%d 耗时=%dms tool_calls=%s",
                         session_id, iteration + 1, llm_ms,
                         [tc["name"] for tc in llm_result["tool_calls"]] if llm_result["tool_calls"] else "无(最终回答)")
@@ -286,6 +291,8 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
                 yield {"type": "reply", "content": reply}
                 if sources_used:
                     yield {"type": "sources", "items": sources_used[:10]}
+                if total_usage["total_tokens"] > 0:
+                    yield {"type": "tokens", "usage": total_usage}
                 yield {"type": "done", "session_id": session_id}
                 return
 
@@ -412,6 +419,7 @@ def _call_llm(provider: dict, messages: list[dict], tools: list[dict]) -> dict:
                 continue
             resp.raise_for_status()
             msg = resp.json()["choices"][0]["message"]
+            usage = resp.json().get("usage", {})
             tool_calls = None
             if msg.get("tool_calls"):
                 tool_calls = [
@@ -419,7 +427,7 @@ def _call_llm(provider: dict, messages: list[dict], tools: list[dict]) -> dict:
                      "arguments": tc["function"]["arguments"]}
                     for tc in msg["tool_calls"]
                 ]
-            return {"content": msg.get("content"), "tool_calls": tool_calls}
+            return {"content": msg.get("content"), "tool_calls": tool_calls, "usage": usage}
         except requests.Timeout:
             raise  # 超时不重试（已有 60s 总护栏）
         except requests.ConnectionError as e:

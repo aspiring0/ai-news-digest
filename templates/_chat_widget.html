@@ -1,17 +1,32 @@
-<!-- Agent 聊天框 v2：流式 + 确认 + 页面上下文 -->
+<!-- Agent 聊天框 v3：流式 + 确认 + 上下文 + 斜杠命令 + 会话列表 + 主动建议 + Token 统计 -->
 <div id="chat-fab" title="AI 资讯助手">💬</div>
 <div id="chat-panel" class="hidden">
   <div class="chat-head">
     <b>AI 资讯助手</b>
-    <span>
-      <button id="chat-clear" title="清空对话" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
-      <button id="chat-export" title="导出为 Markdown" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px;margin-left:6px">导出</button>
+    <span style="display:flex;gap:4px;align-items:center">
+      <button id="chat-sessions-btn" title="历史会话" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px">📋</button>
+      <button id="chat-export" title="导出" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">导出</button>
+      <button id="chat-clear" title="清空" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
       <button id="chat-close" title="收起" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
     </span>
   </div>
-  <div id="chat-messages" class="chat-body">
-    <div class="chat-hint">用自然语言操控你的资讯台：<br>·「最近有什么 Claude 新闻？」<br>·「热榜前 5 给我看看」<br>·「这条帮我收藏一下」<br>·「别再推融资类的了」</div>
+
+  <!-- A8: 会话列表面板 -->
+  <div id="chat-sessions" class="chat-sessions hidden">
+    <div style="padding:6px 12px;font-size:11px;color:var(--muted);border-bottom:1px dashed var(--border)">历史会话（点击切换）</div>
+    <div id="chat-sessions-list"></div>
   </div>
+
+  <!-- A10: 主动建议 -->
+  <div id="chat-suggest" class="chat-suggest hidden"></div>
+
+  <div id="chat-messages" class="chat-body">
+    <div class="chat-hint">用自然语言或 <b>/</b> 命令操控：<br>·「最近有什么 Claude 新闻？」<br>·「热榜前 5」 ·「这条收藏一下」<br>· <code>/search 关键词</code> · <code>/trending</code> · <code>/health</code></div>
+  </div>
+
+  <!-- A2: 斜杠命令自动补全 -->
+  <div id="chat-cmd-hint" class="chat-cmd-hint hidden"></div>
+
   <div id="chat-tools" class="chat-tools hidden"></div>
   <div id="chat-confirm" class="chat-confirm hidden">
     <span id="chat-confirm-text"></span>
@@ -20,10 +35,12 @@
       <button id="chat-confirm-no">✗ 取消</button>
     </span>
   </div>
+
   <div class="chat-input-row">
-    <input type="text" id="chat-input" placeholder="输入消息…" aria-label="消息">
+    <input type="text" id="chat-input" placeholder="输入消息或 / 命令…" aria-label="消息" autocomplete="off">
     <button id="chat-send">发送</button>
   </div>
+  <div id="chat-tokens" class="chat-tokens hidden"></div>
 </div>
 
 <style>
@@ -32,15 +49,30 @@
     box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center; }
   #chat-fab:hover{transform:scale(1.08)}
   #chat-panel.hidden{display:none}
-  #chat-panel{position:fixed;bottom:80px;right:20px;z-index:81;width:min(400px,calc(100vw - 32px));
-    max-height:min(560px,calc(100vh - 120px));background:var(--card);border:1px solid var(--border);
+  #chat-panel{position:fixed;bottom:80px;right:20px;z-index:81;width:min(420px,calc(100vw - 32px));
+    max-height:min(600px,calc(100vh - 120px));background:var(--card);border:1px solid var(--border);
     border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden}
   .chat-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
     border-bottom:2px solid var(--text);background:var(--bg)}
   .chat-head b{font-family:var(--serif);font-size:14px}
+
+  .chat-sessions{max-height:160px;overflow-y:auto;border-bottom:1px solid var(--border);background:var(--bg)}
+  .chat-sessions.hidden{display:none}
+  .chat-session-item{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;
+    font-size:12px;cursor:pointer;border-bottom:1px dashed var(--border)}
+  .chat-session-item:hover{background:var(--blue-bg)}
+  .chat-session-item.active{background:var(--blue-bg);font-weight:600}
+  .chat-session-item .time{color:var(--muted);font-size:10px}
+
+  .chat-suggest{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px dashed var(--border);background:var(--bg)}
+  .chat-suggest.hidden{display:none}
+  .suggest-chip{font-size:11px;padding:3px 10px;border:1px solid var(--blue);border-radius:999px;
+    color:var(--blue-dark);cursor:pointer;background:var(--blue-bg)}
+  .suggest-chip:hover{background:var(--blue);color:#fff}
+
   .chat-body{flex:1;overflow-y:auto;padding:12px;font-size:13.5px;line-height:1.65;
     display:flex;flex-direction:column;gap:10px}
-  .chat-hint{color:var(--muted);font-size:12px;text-align:center;padding:16px 8px;line-height:2}
+  .chat-hint{color:var(--muted);font-size:12px;text-align:center;padding:12px 8px;line-height:2}
   .chat-msg{max-width:88%;padding:8px 12px;border-radius:10px;overflow-wrap:anywhere}
   .chat-msg.user{align-self:flex-end;background:var(--blue-bg);color:var(--blue-dark);border:1px solid var(--blue)}
   .chat-msg.bot{align-self:flex-start;background:var(--bg);border:1px solid var(--border)}
@@ -49,10 +81,18 @@
   .chat-loading{color:var(--muted);font-size:12px;align-self:flex-start;padding:4px 12px}
   .chat-loading::after{content:"…";animation:dots 1.5s infinite}
   @keyframes dots{0%,100%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+  .chat-cmd-hint{padding:4px 12px;background:var(--bg);border-top:1px dashed var(--border);font-size:12px}
+  .chat-cmd-hint.hidden{display:none}
+  .chat-cmd-hint .cmd-item{padding:2px 0;cursor:pointer;color:var(--blue-dark)}
+  .chat-cmd-hint .cmd-item:hover{text-decoration:underline}
+  .chat-cmd-hint .cmd-desc{color:var(--muted);margin-left:8px;font-size:11px}
+
   .chat-tools{padding:6px 12px;border-top:1px dashed var(--border);font-size:11px;color:var(--muted);
-    max-height:80px;overflow-y:auto;background:var(--bg)}
+    max-height:60px;overflow-y:auto;background:var(--bg)}
   .chat-tools.hidden{display:none}
   .chat-tools .tool-line{margin:2px 0}
+
   .chat-confirm{display:flex;justify-content:space-between;align-items:center;gap:8px;
     padding:10px 12px;border-top:2px solid var(--amber-text);background:var(--amber-bg);
     font-size:12.5px;color:var(--amber-text)}
@@ -60,6 +100,7 @@
   .chat-confirm button{border:1px solid var(--amber-text);background:none;color:var(--amber-text);
     border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;margin-left:4px}
   .chat-confirm #chat-confirm-yes{background:var(--amber-text);color:#fff}
+
   .chat-input-row{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border)}
   .chat-input-row input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;
     background:var(--bg);color:var(--text);font-size:13px}
@@ -67,6 +108,10 @@
   .chat-input-row button{border:none;background:var(--blue);color:#fff;border-radius:8px;
     padding:6px 16px;font-size:13px;cursor:pointer}
   .chat-input-row button:disabled{opacity:.5}
+
+  .chat-tokens{padding:4px 12px;font-size:10px;color:var(--muted);text-align:right;background:var(--bg);
+    border-top:1px dashed var(--border)}
+  .chat-tokens.hidden{display:none}
 </style>
 
 <script>
@@ -79,93 +124,121 @@
   var toolsBox = document.getElementById("chat-tools");
   var confirmBox = document.getElementById("chat-confirm");
   var confirmText = document.getElementById("chat-confirm-text");
+  var cmdHint = document.getElementById("chat-cmd-hint");
+  var sessionsPanel = document.getElementById("chat-sessions");
+  var sessionsList = document.getElementById("chat-sessions-list");
+  var suggestBox = document.getElementById("chat-suggest");
+  var tokensBox = document.getElementById("chat-tokens");
   var sessionId = "";
+  var totalTokens = 0;
 
-  fab.addEventListener("click", function () { panel.classList.toggle("hidden"); if (!panel.classList.contains("hidden")) input.focus(); });
-  document.getElementById("chat-close").addEventListener("click", function () { panel.classList.add("hidden"); });
-  document.getElementById("chat-clear").addEventListener("click", async function () {
-    if (sessionId) await fetch("/api/chat?session_id=" + encodeURIComponent(sessionId), { method: "DELETE" });
-    sessionId = ""; msgs.innerHTML = "";
-    toolsBox.classList.add("hidden"); confirmBox.classList.add("hidden");
-  });
+  // ── A2: 斜杠命令 ──
+  var COMMANDS = {
+    "/search": { desc: "搜索新闻", usage: "/search <关键词>", to: function (args) { return "搜索 " + args; } },
+    "/trending": { desc: "热榜", usage: "/trending [条数]", to: function (args) { return "热榜前 " + (args || 5) + " 条"; } },
+    "/health": { desc: "源状态", usage: "/health", to: function () { return "各源最近状态如何？有多少个正常？"; } },
+    "/bookmark": { desc: "收藏", usage: "/bookmark <URL或编号>", to: function (args) { return "帮我收藏 " + args; } },
+    "/block": { desc: "屏蔽", usage: "/block <来源或分类>", to: function (args) { return "帮我屏蔽 " + args; } },
+    "/summary": { desc: "摘要", usage: "/summary <关键词>", to: function (args) { return "给我一篇关于 " + args + " 的摘要"; } },
+    "/help": { desc: "帮助", usage: "/help", to: function () { return "你能做什么？列出你的所有功能。"; } },
+  };
 
-  // A9: 导出对话为 Markdown
-  document.getElementById("chat-export").addEventListener("click", async function () {
-    if (!sessionId) { alert("没有可导出的对话"); return; }
-    try {
-      const r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sessionId));
-      const d = await r.json();
-      if (!d.messages.length) { alert("对话为空"); return; }
-      var lines = ["# AI 资讯助手对话记录", ""];
-      d.messages.forEach(function (m) {
-        lines.push(m.role === "user" ? "**👤 我：**" : "**🤖 助手：**");
-        lines.push(m.content);
-        lines.push("");
-      });
-      var text = lines.join("\n");
-      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-        .then(function () { alert("已复制到剪贴板（Markdown 格式）"); })
-        .catch(function () {
-          var ta = document.createElement("textarea");
-          ta.value = text; document.body.appendChild(ta); ta.select();
-          document.execCommand("copy"); ta.remove();
-          alert("已复制到剪贴板");
-        });
-    } catch (e) { alert("导出失败"); }
-  });
-
-  // A11: 打开聊天时自动给今日简报（仅首次，无历史时）
-  fab.addEventListener("click", async function () {
-    if (!sessionId && !msgs.querySelector(".chat-msg")) {
-      // 自动加载今日简报
-      var briefing = document.createElement("div");
-      briefing.className = "chat-msg bot";
-      briefing.innerHTML = '<span style="color:var(--muted)">正在获取今日简报…</span>';
-      msgs.appendChild(briefing);
-      try {
-        const r = await fetch("/api/chat/stream", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: "给我今日热榜前 5 的简报，每条一句话即可", session_id: "" })
-        });
-        const reader = r.body.getReader();
-        const decoder = new TextDecoder();
-        var buf = "";
-        briefing.remove();
-        while (true) {
-          var chunk = await reader.read();
-          if (chunk.done) break;
-          buf += decoder.decode(chunk.value, { stream: true });
-          var lines2 = buf.split("\n");
-          buf = lines2.pop();
-          for (var j = 0; j < lines2.length; j++) {
-            var l = lines2[j].trim();
-            if (!l.startsWith("data: ")) continue;
-            try {
-              var ev2 = JSON.parse(l.slice(6));
-              if (ev2.type === "reply") { addMsg("bot", ev2.content); }
-              else if (ev2.type === "tool") { addToolLine(ev2.tool, ev2.args); }
-              else if (ev2.type === "tool_result") { /* skip */ }
-              else if (ev2.type === "done") { sessionId = ev2.session_id; }
-            } catch (e) {}
-          }
-        }
-      } catch (e) {
-        briefing.remove();
-        addMsg("bot", "今日简报获取失败，请手动提问。");
-      }
+  function showCmdHint(prefix) {
+    var matches = Object.keys(COMMANDS).filter(function (c) { return c.startsWith(prefix); });
+    if (!matches.length || prefix === "/") { cmdHint.classList.add("hidden"); return; }
+    if (prefix.length <= 1 && matches.length === Object.keys(COMMANDS).length) {
+      // 输入 / 时显示全部
     }
+    cmdHint.innerHTML = matches.map(function (c) {
+      return '<div class="cmd-item" data-cmd="' + c + '">' + c + ' <span class="cmd-desc">' + COMMANDS[c].desc + "</span></div>";
+    }).join("");
+    cmdHint.classList.remove("hidden");
+    cmdHint.querySelectorAll(".cmd-item").forEach(function (el) {
+      el.addEventListener("click", function () {
+        input.value = el.getAttribute("data-cmd") + " ";
+        cmdHint.classList.add("hidden");
+        input.focus();
+      });
+    });
+  }
+
+  input.addEventListener("input", function () {
+    var v = input.value.trim();
+    if (v.startsWith("/") && !v.includes(" ")) showCmdHint(v);
+    else cmdHint.classList.add("hidden");
   });
 
-  // 确认按钮
-  document.getElementById("chat-confirm-yes").addEventListener("click", function () {
-    confirmBox.classList.add("hidden");
-    send("是");
-  });
-  document.getElementById("chat-confirm-no").addEventListener("click", function () {
-    confirmBox.classList.add("hidden");
-    send("不");
+  function translateCommand(text) {
+    var trimmed = text.trim();
+    if (!trimmed.startsWith("/")) return text;
+    var parts = trimmed.split(/\s+(.+)/);
+    var cmd = parts[0];
+    var args = parts[1] || "";
+    if (COMMANDS[cmd]) return COMMANDS[cmd].to(args);
+    return text; // 未知命令原样发送
+  }
+
+  // ── A8: 会话列表 ──
+  async function loadSessions() {
+    try {
+      var r = await fetch("/api/chat/sessions");
+      var d = await r.json();
+      if (!d.sessions || !d.sessions.length) {
+        sessionsList.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">暂无历史会话</div>';
+        return;
+      }
+      sessionsList.innerHTML = d.sessions.slice(0, 8).map(function (s) {
+        var time = (s.last_at || "").replace("T", " ").slice(5, 16);
+        var active = s.session_id === sessionId ? " active" : "";
+        return '<div class="chat-session-item' + active + '" data-sid="' + s.session_id + '">' +
+          '<span>#' + s.session_id.slice(0, 8) + '</span><span class="time">' + time + ' · ' + s.msg_count + '条</span></div>';
+      }).join("");
+      sessionsList.querySelectorAll(".chat-session-item").forEach(function (el) {
+        el.addEventListener("click", async function () {
+          sessionId = el.getAttribute("data-sid");
+          await loadHistory(sessionId);
+          sessionsPanel.classList.add("hidden");
+        });
+      });
+    } catch (e) { /* 静默 */ }
+  }
+
+  document.getElementById("chat-sessions-btn").addEventListener("click", function () {
+    sessionsPanel.classList.toggle("hidden");
+    if (!sessionsPanel.classList.contains("hidden")) loadSessions();
   });
 
+  async function loadHistory(sid) {
+    msgs.innerHTML = "";
+    try {
+      var r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sid));
+      var d = await r.json();
+      d.messages.forEach(function (m) { addMsg(m.role === "user" ? "user" : "bot", m.content); });
+    } catch (e) { /* 静默 */ }
+  }
+
+  // ── A10: 主动建议 ──
+  async function loadSuggestions() {
+    try {
+      var r = await fetch("/api/profile");
+      var d = await r.json();
+      if (!d.profile || !d.profile.likes || !d.profile.likes.length) return;
+      var likes = d.profile.likes.slice(0, 3);
+      suggestBox.innerHTML = likes.map(function (topic) {
+        return '<span class="suggest-chip" data-topic="' + topic + '">🔎 ' + topic + '有新动态吗？</span>';
+      }).join("") + '<span class="suggest-chip" data-topic="__trending">📊 今日热榜</span>';
+      suggestBox.classList.remove("hidden");
+      suggestBox.querySelectorAll(".suggest-chip").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          var t = chip.getAttribute("data-topic");
+          var msg = t === "__trending" ? "热榜前 5 给我看看" : "最近有什么关于「" + t + "」的新动态？";
+          send(msg);
+        });
+      });
+    } catch (e) { /* 无画像时静默 */ }
+  }
+
+  // ── 工具函数 ──
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -173,17 +246,11 @@
   }
 
   function mdToHtml(md) {
-    // 极简 Markdown → HTML（加粗/表格/列表/代码/链接）
     var s = esc(md);
-    // 代码块
     s = s.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg);padding:8px;border-radius:6px;font-size:12px;overflow-x:auto">$2</pre>');
-    // 行内代码
     s = s.replace(/`([^`]+)`/g, '<code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
-    // 加粗
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-    // 链接 [text](url)
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--blue)">$1</a>');
-    // 表格：| a | b | 格式
     var lines = s.split("\n");
     var html = [];
     var inTable = false;
@@ -191,19 +258,16 @@
       var line = lines[i];
       if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
         var cells = line.split("|").slice(1, -1).map(function (c) { return c.trim(); });
-        if (cells.every(function (c) { return /^[-: ]+$/.test(c); })) continue; // 分隔行跳过
+        if (cells.every(function (c) { return /^[-: ]+$/.test(c); })) continue;
         if (!inTable) { html.push('<table style="border-collapse:collapse;width:100%;font-size:12px;margin:4px 0">'); inTable = true; }
         html.push("<tr>" + cells.map(function (c) { return '<td style="border:1px solid var(--border);padding:4px 8px">' + c + "</td>"; }).join("") + "</tr>");
       } else {
         if (inTable) { html.push("</table>"); inTable = false; }
-        // 无序列表
         if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
           html.push("<li style='margin-left:16px'>" + line.trim().slice(2) + "</li>");
         } else if (/^\d+\.\s/.test(line.trim())) {
           html.push("<li style='margin-left:16px;list-style:decimal'>" + line.trim().replace(/^\d+\.\s/, "") + "</li>");
-        } else {
-          html.push(line);
-        }
+        } else { html.push(line); }
       }
     }
     if (inTable) html.push("</table>");
@@ -239,23 +303,28 @@
   function getPageContext() {
     var items = [];
     document.querySelectorAll(".item[data-url]").forEach(function (el, i) {
-      if (i < 10) {
-        items.push({
-          n: i + 1,
-          title: (el.querySelector(".title") || {}).textContent || el.getAttribute("data-title") || "",
-          url: el.getAttribute("data-url") || ""
-        });
-      }
+      if (i < 10) items.push({ n: i + 1, title: (el.querySelector(".title") || {}).textContent || "", url: el.getAttribute("data-url") || "" });
     });
     return items;
   }
 
+  function updateTokens(usage) {
+    if (usage && usage.total_tokens) {
+      totalTokens += usage.total_tokens;
+      tokensBox.textContent = "本次会话 ~" + totalTokens.toLocaleString() + " tokens";
+      tokensBox.classList.remove("hidden");
+    }
+  }
+
+  // ── 发送（流式） ──
   async function send(overrideMessage) {
-    var text = overrideMessage || input.value.trim();
-    if (!text || sendBtn.disabled) return;
+    var raw = overrideMessage || input.value.trim();
+    if (!raw || sendBtn.disabled) return;
     if (!overrideMessage) input.value = "";
+    cmdHint.classList.add("hidden");
     sendBtn.disabled = true;
-    addMsg("user", text);
+    var text = translateCommand(raw);
+    addMsg("user", raw); // 显示原始输入（含 / 命令）
 
     var loading = document.createElement("div");
     loading.className = "chat-loading";
@@ -265,17 +334,12 @@
 
     try {
       var resp = await fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, session_id: sessionId, page_context: getPageContext() })
       });
-
       var reader = resp.body.getReader();
       var decoder = new TextDecoder();
       var buf = "";
-      var finalReply = "";
-      var finalSources = [];
-
       while (true) {
         var chunk = await reader.read();
         if (chunk.done) break;
@@ -285,74 +349,133 @@
         for (var i = 0; i < lines.length; i++) {
           var line = lines[i].trim();
           if (!line.startsWith("data: ")) continue;
-          try {
-            var ev = JSON.parse(line.slice(6));
-            handleEvent(ev);
-          } catch (e) { /* 忽略解析失败 */ }
+          try { handleEvent(JSON.parse(line.slice(6))); } catch (e) {}
         }
       }
-    } catch (e) {
-      loading.remove();
-      addMsg("bot", "❌ 网络错误");
-    }
+    } catch (e) { loading.remove(); addMsg("bot", "❌ 网络错误"); }
     loading.remove();
     sendBtn.disabled = false;
     input.focus();
 
     function handleEvent(ev) {
       switch (ev.type) {
-        case "tool":
-          addToolLine(ev.tool, ev.args);
-          break;
+        case "tool": addToolLine(ev.tool, ev.args); break;
         case "tool_result":
-          // 更新最后一条工具行的结果
-          var lines = toolsBox.querySelectorAll(".tool-line");
-          if (lines.length) {
-            var last = lines[lines.length - 1];
-            if (ev.count !== undefined) last.textContent = last.textContent.replace("…", " → " + ev.count + " 条");
-            else last.textContent = last.textContent.replace("…", " → ✓");
+          var lines2 = toolsBox.querySelectorAll(".tool-line");
+          if (lines2.length) {
+            var last = lines2[lines2.length - 1];
+            last.textContent = last.textContent.replace("…", ev.count !== undefined ? " → " + ev.count + " 条" : " → ✓");
           }
           break;
         case "confirm":
-          loading.remove();
-          confirmBox.classList.remove("hidden");
-          confirmText.textContent = "⚠️ " + ev.description;
-          sendBtn.disabled = false;
+          loading.remove(); confirmBox.classList.remove("hidden");
+          confirmText.textContent = "⚠️ " + ev.description; sendBtn.disabled = false;
           break;
-        case "reply":
-          loading.remove();
-          addMsg("bot", ev.content, null);
-          finalReply = ev.content;
-          break;
+        case "reply": loading.remove(); addMsg("bot", ev.content, null); break;
         case "sources":
-          finalSources = ev.items || [];
-          // 更新最后一条 bot 消息加来源
           var botMsgs = msgs.querySelectorAll(".chat-msg.bot");
-          if (botMsgs.length && finalSources.length) {
+          if (botMsgs.length && ev.items && ev.items.length) {
             var lastBot = botMsgs[botMsgs.length - 1];
             var srcHtml = '<div class="chat-sources">📎 ';
-            srcHtml += finalSources.slice(0, 5).map(function (s) {
+            srcHtml += ev.items.slice(0, 5).map(function (s) {
               return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc((s.title || "").slice(0, 30)) + "</a>";
             }).join(" · ");
-            srcHtml += "</div>";
-            lastBot.innerHTML += srcHtml;
+            lastBot.innerHTML += srcHtml + "</div>";
           }
           break;
-        case "done":
-          sessionId = ev.session_id || sessionId;
-          break;
-        case "error":
-          loading.remove();
-          addMsg("bot", "❌ " + ev.message);
-          break;
+        case "tokens": updateTokens(ev.usage); break;
+        case "done": sessionId = ev.session_id || sessionId; break;
+        case "error": loading.remove(); addMsg("bot", "❌ " + ev.message); break;
       }
       msgs.scrollTop = msgs.scrollHeight;
     }
   }
 
+  // ── 事件绑定 ──
   sendBtn.addEventListener("click", function () { send(); });
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === "Escape") { cmdHint.classList.add("hidden"); }
+  });
+
+  document.getElementById("chat-confirm-yes").addEventListener("click", function () {
+    confirmBox.classList.add("hidden"); send("是");
+  });
+  document.getElementById("chat-confirm-no").addEventListener("click", function () {
+    confirmBox.classList.add("hidden"); send("不");
+  });
+
+  document.getElementById("chat-clear").addEventListener("click", async function () {
+    if (sessionId) await fetch("/api/chat?session_id=" + encodeURIComponent(sessionId), { method: "DELETE" });
+    sessionId = ""; totalTokens = 0;
+    msgs.innerHTML = ""; toolsBox.classList.add("hidden"); confirmBox.classList.add("hidden");
+    suggestBox.classList.add("hidden"); tokensBox.classList.add("hidden");
+    loadSuggestions();
+  });
+
+  document.getElementById("chat-export").addEventListener("click", async function () {
+    if (!sessionId) { alert("没有可导出的对话"); return; }
+    try {
+      var r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sessionId));
+      var d = await r.json();
+      if (!d.messages.length) { alert("对话为空"); return; }
+      var lines = ["# AI 资讯助手对话记录", ""];
+      d.messages.forEach(function (m) {
+        lines.push(m.role === "user" ? "**👤 我：**" : "**🤖 助手：**");
+        lines.push(m.content); lines.push("");
+      });
+      var text = lines.join("\n");
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+        .then(function () { alert("已复制到剪贴板"); })
+        .catch(function () {
+          var ta = document.createElement("textarea");
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); ta.remove(); alert("已复制");
+        });
+    } catch (e) { alert("导出失败"); }
+  });
+
+  document.getElementById("chat-close").addEventListener("click", function () { panel.classList.add("hidden"); });
+
+  // ── 开屏：简报 + 主动建议 ──
+  fab.addEventListener("click", async function () {
+    panel.classList.remove("hidden");
+    input.focus();
+    if (!sessionId && !msgs.querySelector(".chat-msg")) {
+      loadSuggestions();
+      // 开屏简报
+      var briefing = document.createElement("div");
+      briefing.className = "chat-msg bot";
+      briefing.innerHTML = '<span style="color:var(--muted)">📊 正在获取今日简报…</span>';
+      msgs.appendChild(briefing);
+      try {
+        var resp = await fetch("/api/chat/stream", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "今日热榜前5简报，每条一句话", session_id: "" })
+        });
+        var reader = resp.body.getReader();
+        var decoder = new TextDecoder();
+        var buf2 = "";
+        briefing.remove();
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buf2 += decoder.decode(chunk.value, { stream: true });
+          var lines3 = buf2.split("\n");
+          buf2 = lines3.pop();
+          for (var k = 0; k < lines3.length; k++) {
+            var l = lines3[k].trim();
+            if (!l.startsWith("data: ")) continue;
+            try {
+              var ev3 = JSON.parse(l.slice(6));
+              if (ev3.type === "reply") addMsg("bot", ev3.content);
+              else if (ev3.type === "tool") addToolLine(ev3.tool, ev3.args);
+              else if (ev3.type === "done") sessionId = ev3.session_id;
+            } catch (e) {}
+          }
+        }
+      } catch (e) { briefing.remove(); addMsg("bot", "简报获取失败，请手动提问。"); }
+    }
   });
 })();
 </script>
