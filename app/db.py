@@ -614,3 +614,11 @@ def delete_summary(url: str) -> None:
     """清除某 URL 的摘要缓存（重新生成前调用）。"""
     with _connect() as conn:
         conn.execute("DELETE FROM summary_cache WHERE url = ?", (url,))
+
+
+def clear_stale_summaries(days: int = 30) -> int:
+    """删除 N 天前的摘要缓存（孤儿缓存随时间清理；30 天而非 14 天——书签页的过期条目仍可能命中旧缓存）。"""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM summary_cache WHERE created_at < ?", (cutoff,))
+        return cur.rowcount
