@@ -2,6 +2,18 @@
 
 ## 未发布
 
+功能：GitHub 生态独立页
+
+- **为什么**：GitHub 类内容（Trending / Releases / Star 飙升）此前混排在
+  热榜/时间线里，想专看仓库动态要靠来源筛选；独立入口 + API 更直接。
+- **做了什么**：`GET /github` 页面（复用 `_item.html`，GitHub 条目的
+  Clone/Fork 快捷操作自动生效）+ `GET /api/github`（与时间线同构的
+  `{items, total, page, total_pages}`）；三源按 hot_score 倒序，屏蔽项
+  过滤与收藏标记语义与其他页面一致；导航新增 GitHub 入口。零数据结构
+  变更（纯查询层视图）。元数据扩展（star 数/语言等）明确不做——需要
+  schema 改动，等真有需要再走完整流程。
+- **测试**：+4（三源过滤+排序 / 屏蔽过滤 / 页面渲染 / 分页超界）。
+
 加固（审计 P2 批）
 
 - **为什么**：① push 配置损坏时 `get_config` 返回 None（`__defaults__` 误用，

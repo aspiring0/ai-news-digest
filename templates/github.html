@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+{% block title %}GitHub · AI 资讯聚合{% endblock %}
+{% block nav_active %}github{% endblock %}
+{% block content %}
+<h1>🐙 GitHub 生态</h1>
+<p class="hint">Trending / Releases / Star 飙升三源混排，按热度倒序，共 {{ total }} 条。GitHub 条目自带 Clone / Fork 快捷操作。</p>
+{% if items %}
+  <p style="margin:-6px 0 12px"><label class="unread-toggle"><input type="checkbox" id="only-unread"> 只看未读</label></p>
+  <div id="github-list">
+  {% for it in items %}{% include "_item.html" %}{% endfor %}
+  </div>
+  <div class="pager">
+    {% if page > 1 %}<a href="/github?page={{ page - 1 }}">← 上一页</a>{% endif %}
+    <span class="cur">第 {{ page }} / {{ total_pages }} 页</span>
+    {% if page < total_pages %}<a href="/github?page={{ page + 1 }}">下一页 →</a>{% endif %}
+  </div>
+{% else %}
+  <div class="empty">暂无数据，首次抓取可能还在进行中，稍后刷新试试。</div>
+{% endif %}
+{% endblock %}
