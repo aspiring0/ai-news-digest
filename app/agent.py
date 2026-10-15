@@ -365,7 +365,16 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
 
     except requests.Timeout:
         logger.warning("[agent] LLM超时 session=%s elapsed=%.1fs", session_id, time.time() - start)
-        yield {"type": "error", "message": "模型调用超时，请稍后重试"}
+        yield {"type": "error", "message": "模型响应超时。可能是网络波动或模型负载高，请稍后重试。"}
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response else "?"
+        logger.error("[agent] LLM HTTP错误 session=%s status=%s", session_id, status)
+        if status == "401":
+            yield {"type": "error", "message": "API key 无效或已过期，请到设置页检查。"}
+        elif status in ("429", "503"):
+            yield {"type": "error", "message": f"模型服务暂时不可用（{status}），已重试仍失败。请稍后再试。"}
+        else:
+            yield {"type": "error", "message": f"模型接口返回错误 {status}，请稍后重试。"}
     except Exception as e:  # noqa: BLE001
         logger.error("[agent] 异常 session=%s error=%s", session_id, e, exc_info=True)
         yield {"type": "error", "message": f"Agent 出错: {e}"}
@@ -376,29 +385,50 @@ def run_agent_stream(session_id: str, user_message: str, page_context: list[dict
 # ══════════════════════════════════════════════════════════
 
 def _call_llm(provider: dict, messages: list[dict], tools: list[dict]) -> dict:
-    resp = requests.post(
-        chat_url(provider["id"], provider["base_url"]),
-        headers={"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"},
-        json={
-            "model": provider.get("model") or "default",
-            "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto",
-            "temperature": 0.3,
-            "max_tokens": 2000,
-        },
-        timeout=55,
-    )
-    resp.raise_for_status()
-    msg = resp.json()["choices"][0]["message"]
-    tool_calls = None
-    if msg.get("tool_calls"):
-        tool_calls = [
-            {"id": tc["id"], "name": tc["function"]["name"],
-             "arguments": tc["function"]["arguments"]}
-            for tc in msg["tool_calls"]
-        ]
-    return {"content": msg.get("content"), "tool_calls": tool_calls}
+    """调 LLM 的 /chat/completions（带重试：503/429 等瞬态错误最多重试 2 次）。"""
+    import time as _time
+
+    last_err = None
+    for attempt in range(3):  # 最多 3 次（1 原始 + 2 重试）
+        try:
+            resp = requests.post(
+                chat_url(provider["id"], provider["base_url"]),
+                headers={"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"},
+                json={
+                    "model": provider.get("model") or "default",
+                    "messages": messages,
+                    "tools": tools,
+                    "tool_choice": "auto",
+                    "temperature": 0.3,
+                    "max_tokens": 2000,
+                },
+                timeout=55,
+            )
+            if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                logger.warning("[agent] LLM 瞬态错误 %d（第 %d 次，%.1fs 后重试）",
+                               resp.status_code, attempt + 1, 1.5 * (attempt + 1))
+                _time.sleep(1.5 * (attempt + 1))  # 指数退避
+                continue
+            resp.raise_for_status()
+            msg = resp.json()["choices"][0]["message"]
+            tool_calls = None
+            if msg.get("tool_calls"):
+                tool_calls = [
+                    {"id": tc["id"], "name": tc["function"]["name"],
+                     "arguments": tc["function"]["arguments"]}
+                    for tc in msg["tool_calls"]
+                ]
+            return {"content": msg.get("content"), "tool_calls": tool_calls}
+        except requests.Timeout:
+            raise  # 超时不重试（已有 60s 总护栏）
+        except requests.ConnectionError as e:
+            last_err = e
+            if attempt < 2:
+                logger.warning("[agent] LLM 连接错误（第 %d 次重试）", attempt + 1)
+                _time.sleep(2)
+                continue
+            raise
+    raise last_err or RuntimeError("LLM 调用失败")
 
 
 # ══════════════════════════════════════════════════════════
