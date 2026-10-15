@@ -97,6 +97,7 @@ def translate_untranslated(limit: int = 60) -> int:
         rows = conn.execute(
             "SELECT url, title FROM news_items"
             " WHERE (title_cn IS NULL OR title_cn = '')"
+            " AND source_name NOT LIKE 'arXiv%'"  # 论文流不占翻译配额（~45 条/日会吃掉 60 条/轮预算），保持英文展示
             " ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT ?",
             (limit,),
         ).fetchall()

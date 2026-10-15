@@ -42,7 +42,7 @@ def test_html_fetcher_contract(monkeypatch, mod_name, src_name, page_url, link_r
 def test_registry_complete():
     from app.fetchers import FETCHERS
 
-    assert len(FETCHERS) == 30, "拆上游续批后应为 30 个源"
+    assert len(FETCHERS) == 31, "拆上游续批(30) + arXiv(1) 后应为 31 个源"
     names = [m.SOURCE_NAME for m in FETCHERS]
     assert len(set(names)) == len(names), "SOURCE_NAME 不得重复"
     for m in FETCHERS:
