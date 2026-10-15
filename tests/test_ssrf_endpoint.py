@@ -65,4 +65,22 @@ def test_summary_bookmarked_url_allowed(client, monkeypatch):
     assert captured["url"] == "https://gone.example/old"
 
 
-# ---------- C4/C5：custom-sources 校验见切片④ ----------
+# ---------- C4 添加解析到内网的自定义源 → 400 ----------
+
+def test_add_custom_source_private_rejected(client, monkeypatch):
+    _dns(monkeypatch, ["10.0.0.9"])
+    r = client.post("/api/custom-sources", json={"name": "内网源", "url": "http://intranet.example/feed"})
+    assert r.status_code == 400
+    body = r.json()["message"]
+    assert "内网" in body or "保留" in body or "受限" in body or "ALLOW_PRIVATE_FETCH" in body
+    assert all(s["url"] != "http://intranet.example/feed" for s in db.list_custom_sources())
+
+
+# ---------- C5 豁免开关下放行 ----------
+
+def test_add_custom_source_private_allowed_with_env(client, monkeypatch):
+    _dns(monkeypatch, ["10.0.0.9"])
+    monkeypatch.setenv("ALLOW_PRIVATE_FETCH", "1")
+    r = client.post("/api/custom-sources", json={"name": "内网源", "url": "http://intranet.example/feed"})
+    assert r.status_code == 200
+    assert any(s["url"] == "http://intranet.example/feed" for s in db.list_custom_sources())

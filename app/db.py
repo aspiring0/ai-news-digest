@@ -459,12 +459,19 @@ def list_custom_sources() -> list[dict]:
 def add_custom_source(name: str, url: str) -> None:
     from urllib.parse import urlparse
 
+    from .urlguard import check_url
+
     name = (name or "").strip()
     url = (url or "").strip()
     if not name:
         raise ValueError("名称不能为空")
     if not url.startswith(("http://", "https://")) or not urlparse(url).hostname:
         raise ValueError("RSS 地址必须是合法的 http(s) URL")
+    # SSRF 防护：源地址不得解析到内网/保留网段（服务端会周期性抓取它）。
+    # 域名解析失败同样拒绝——反正永远抓不到，提前报错优于入列表后每轮失败。
+    ok, reason = check_url(url)
+    if not ok:
+        raise ValueError(f"RSS 地址不允许（{reason}）；确需内网源请设置 ALLOW_PRIVATE_FETCH=1")
     try:
         with _connect() as conn:
             conn.execute(
