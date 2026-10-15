@@ -5,6 +5,7 @@
     <b>AI 资讯助手</b>
     <span>
       <button id="chat-clear" title="清空对话" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
+      <button id="chat-export" title="导出为 Markdown" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px;margin-left:6px">导出</button>
       <button id="chat-close" title="收起" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
     </span>
   </div>
@@ -88,6 +89,73 @@
     toolsBox.classList.add("hidden"); confirmBox.classList.add("hidden");
   });
 
+  // A9: 导出对话为 Markdown
+  document.getElementById("chat-export").addEventListener("click", async function () {
+    if (!sessionId) { alert("没有可导出的对话"); return; }
+    try {
+      const r = await fetch("/api/chat/history?session_id=" + encodeURIComponent(sessionId));
+      const d = await r.json();
+      if (!d.messages.length) { alert("对话为空"); return; }
+      var lines = ["# AI 资讯助手对话记录", ""];
+      d.messages.forEach(function (m) {
+        lines.push(m.role === "user" ? "**👤 我：**" : "**🤖 助手：**");
+        lines.push(m.content);
+        lines.push("");
+      });
+      var text = lines.join("\n");
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+        .then(function () { alert("已复制到剪贴板（Markdown 格式）"); })
+        .catch(function () {
+          var ta = document.createElement("textarea");
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); ta.remove();
+          alert("已复制到剪贴板");
+        });
+    } catch (e) { alert("导出失败"); }
+  });
+
+  // A11: 打开聊天时自动给今日简报（仅首次，无历史时）
+  fab.addEventListener("click", async function () {
+    if (!sessionId && !msgs.querySelector(".chat-msg")) {
+      // 自动加载今日简报
+      var briefing = document.createElement("div");
+      briefing.className = "chat-msg bot";
+      briefing.innerHTML = '<span style="color:var(--muted)">正在获取今日简报…</span>';
+      msgs.appendChild(briefing);
+      try {
+        const r = await fetch("/api/chat/stream", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "给我今日热榜前 5 的简报，每条一句话即可", session_id: "" })
+        });
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        var buf = "";
+        briefing.remove();
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buf += decoder.decode(chunk.value, { stream: true });
+          var lines2 = buf.split("\n");
+          buf = lines2.pop();
+          for (var j = 0; j < lines2.length; j++) {
+            var l = lines2[j].trim();
+            if (!l.startsWith("data: ")) continue;
+            try {
+              var ev2 = JSON.parse(l.slice(6));
+              if (ev2.type === "reply") { addMsg("bot", ev2.content); }
+              else if (ev2.type === "tool") { addToolLine(ev2.tool, ev2.args); }
+              else if (ev2.type === "tool_result") { /* skip */ }
+              else if (ev2.type === "done") { sessionId = ev2.session_id; }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {
+        briefing.remove();
+        addMsg("bot", "今日简报获取失败，请手动提问。");
+      }
+    }
+  });
+
   // 确认按钮
   document.getElementById("chat-confirm-yes").addEventListener("click", function () {
     confirmBox.classList.add("hidden");
@@ -104,10 +172,48 @@
     });
   }
 
+  function mdToHtml(md) {
+    // 极简 Markdown → HTML（加粗/表格/列表/代码/链接）
+    var s = esc(md);
+    // 代码块
+    s = s.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg);padding:8px;border-radius:6px;font-size:12px;overflow-x:auto">$2</pre>');
+    // 行内代码
+    s = s.replace(/`([^`]+)`/g, '<code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
+    // 加粗
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    // 链接 [text](url)
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--blue)">$1</a>');
+    // 表格：| a | b | 格式
+    var lines = s.split("\n");
+    var html = [];
+    var inTable = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+        var cells = line.split("|").slice(1, -1).map(function (c) { return c.trim(); });
+        if (cells.every(function (c) { return /^[-: ]+$/.test(c); })) continue; // 分隔行跳过
+        if (!inTable) { html.push('<table style="border-collapse:collapse;width:100%;font-size:12px;margin:4px 0">'); inTable = true; }
+        html.push("<tr>" + cells.map(function (c) { return '<td style="border:1px solid var(--border);padding:4px 8px">' + c + "</td>"; }).join("") + "</tr>");
+      } else {
+        if (inTable) { html.push("</table>"); inTable = false; }
+        // 无序列表
+        if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
+          html.push("<li style='margin-left:16px'>" + line.trim().slice(2) + "</li>");
+        } else if (/^\d+\.\s/.test(line.trim())) {
+          html.push("<li style='margin-left:16px;list-style:decimal'>" + line.trim().replace(/^\d+\.\s/, "") + "</li>");
+        } else {
+          html.push(line);
+        }
+      }
+    }
+    if (inTable) html.push("</table>");
+    return html.join("\n").replace(/\n/g, "<br>");
+  }
+
   function addMsg(role, text, sources) {
     var el = document.createElement("div");
     el.className = "chat-msg " + role;
-    var html = esc(text).replace(/\n/g, "<br>");
+    var html = role === "bot" ? mdToHtml(text) : esc(text).replace(/\n/g, "<br>");
     if (sources && sources.length) {
       html += '<div class="chat-sources">📎 ';
       html += sources.slice(0, 5).map(function (s) {
