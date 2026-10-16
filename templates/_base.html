@@ -525,42 +525,42 @@ function markRead(url) {
   } catch (e) {}
 })();
 
-/* ---------- 源健康：指示器 + 面板 ---------- */
+/* ---------- 源健康：指示器 + 面板（v2：failed / processing / connected 三态） ---------- */
 (function () {
   var btn = document.getElementById("u-health");
   if (!btn) return;
   var panel = null;
   fetch("/api/sources/health").then(function (r) { return r.json(); }).then(function (d) {
-    var srcs = d.sources || {};
-    var names = Object.keys(srcs);
+    var srcs = d.sources || [];
     /* 源名（自定义源名用户可控）与错误文本一律转义后再入 innerHTML（防存储型 XSS） */
     function escH(s) {
       return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
         return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
       });
     }
-    if (!names.length) { btn.textContent = "源 —"; return; }
-    var okN = names.filter(function (n) { return srcs[n].ok; }).length;
-    btn.textContent = "源 " + okN + "/" + names.length;
-    if (okN < names.length) btn.classList.add("bad");
+    if (!srcs.length) { btn.textContent = "源 —"; return; }
+    var failedN = srcs.filter(function (s) { return s.state === "failed"; }).length;
+    var procN = srcs.filter(function (s) { return s.state === "processing"; }).length;
+    /* 指示条（规格：N 个来源抓取失败 / M 个来源已入库正在整理 / 全部来源已响应） */
+    if (failedN) { btn.textContent = "源 " + failedN + " 个失败"; btn.classList.add("bad"); }
+    else if (procN) { btn.textContent = "源 " + procN + " 个整理中"; }
+    else { btn.textContent = "源 " + srcs.length + " 个已响应"; }
     btn.addEventListener("click", function () {
       if (panel) { panel.remove(); panel = null; return; }
       panel = document.createElement("div");
       panel.className = "health-panel";
-      var rows = names.map(function (n) {
-        var s = srcs[n];
-        /* 三态：✓ 有条数（绿）/ ok 但 0 条（黄 ⚠——失败被源内部捕获后返回空列表，绿色会掩盖问题）/ ✗ 失败 */
+      var rows = srcs.map(function (s) {
         var state;
-        if (!s.ok) {
-          state = '<span class="fail">✗ ' + escH(String(s.error || "失败").slice(0, 60)) + "</span>";
-        } else if (Number(s.fetched) > 0) {
-          state = '<span class="ok">✓ ' + escH(s.fetched) + " 条</span>";
+        if (s.state === "failed") {
+          state = '<span class="fail">✗ ' + escH(String(s.detail || "失败").slice(0, 60)) + "</span>";
+        } else if (s.state === "processing") {
+          state = '<span class="ok" style="color:var(--blue)">· 整理中</span>';
         } else {
-          state = '<span class="ok" style="color:var(--amber-text)">⚠ 0 条</span>';
+          state = '<span class="ok">✓ ' + escH(s.item_count) + " 条" + (s.detail ? "（" + escH(s.detail) + "）" : "") + "</span>";
         }
-        return '<div class="health-row"><span>' + escH(n) + "</span>" + state + "</div>";
+        return '<div class="health-row"><span>' + escH(s.name) + "</span>" + state + "</div>";
       });
-      panel.innerHTML = "<h4>各源最近一轮抓取</h4>" + rows.join("");
+      panel.innerHTML = "<h4>各源状态（抓取 / 中文整理）</h4>" + rows.join("");
       document.body.appendChild(panel);
     });
   }).catch(function () { btn.textContent = "源 ?"; });

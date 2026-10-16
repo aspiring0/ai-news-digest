@@ -253,10 +253,11 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     fetched = _parse(row["fetched_at"]) or datetime.now(timezone.utc)
     score = float(row["score"])
     keys = row.keys()
-    return {
+    title_cn = row["title_cn"] if "title_cn" in keys else None
+    out = {
         "url": row["url"],
         "title": row["title"],
-        "title_cn": row["title_cn"] if "title_cn" in keys else None,
+        "title_cn": title_cn,
         "description_cn": row["description_cn"] if "description_cn" in keys else None,
         "source_name": row["source_name"],
         "published_at": published,
@@ -265,6 +266,10 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
         "summary": row["summary"] if "summary" in keys else None,
         "hot_score": round(hot_score(score, published, fetched), 2),
     }
+    # B1：待中文整理（英文未翻译）→ 响应层实时计算（落点①），翻译完成自动消失
+    if not title_cn and _needs_cn_translation(row["title"]):
+        out["processing_status"] = "pending"
+    return out
 
 
 def get_hot(page: int = 1, per_page: int = 20, max_per_source: int = 4) -> tuple[list[dict], int]:
@@ -344,6 +349,32 @@ def _compute_ranked_stories(profile: dict | None, max_per_source: int = 4) -> li
 
 
 _CJK_QUERY_RE = re.compile(r"[\u4e00-\u9fff]")
+_LATIN_WORD_RE = re.compile(r"[A-Za-z]{3,}")
+
+
+def _needs_cn_translation(title: str | None) -> bool:
+    """标题是否待中文整理（英文未翻译）。与 translator._needs_translation 同义——
+    db 不反向依赖 translator（循环导入），逻辑内联于此。"""
+    if not title or _CJK_QUERY_RE.search(title):
+        return False
+    return bool(_LATIN_WORD_RE.search(title))
+
+
+def pending_translation_counts() -> dict[str, int]:
+    """各源"待中文整理"条数——/api/sources/health 的 processing 状态依据。
+
+    arXiv 论文按接入决策保持英文（不占翻译配额），不构成"整理中"。
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT source_name, title FROM news_items"
+            " WHERE (title_cn IS NULL OR title_cn = '') AND source_name NOT LIKE 'arXiv%'"
+        ).fetchall()
+    counts: dict[str, int] = {}
+    for r in rows:
+        if _needs_cn_translation(r["title"]):
+            counts[r["source_name"]] = counts.get(r["source_name"], 0) + 1
+    return counts
 
 
 def _search_cjk(q: str, limit: int) -> list[dict]:
