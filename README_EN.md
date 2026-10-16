@@ -2,7 +2,7 @@
 
 [中文文档](README.md) | **English**
 
-A self-hosted AI news aggregator: fetches 19 AI sources on schedule, ranks stories by time-decayed hotness (with multi-source story merging and per-source diversity quota), and offers AI-powered summaries using your own model key. Single-file SQLite, all data stays on your machine.
+A self-hosted AI news aggregator: fetches 31 AI sources on schedule, ranks stories by time-decayed hotness (with multi-source story merging and per-source diversity quota), and offers AI-powered summaries using your own model key. English titles are auto-translated to Chinese. Full-text search (CJK substring + English FTS prefix), a dedicated GitHub ecosystem page, optional push notifications, and PWA support are included. Single-file SQLite, all data stays on your machine.
 
 ## Screenshots
 
@@ -19,6 +19,7 @@ A self-hosted AI news aggregator: fetches 19 AI sources on schedule, ranks stori
 ### Option 1: Download executable (no Python required, recommended)
 
 Download the single-file executable for your platform from [Releases](../../releases) (`ai-news.exe` / `ai-news`), place it in any directory and **double-click** — it auto-creates the database, fetches, and opens your browser.
+> Releases are **pending** (CI builds temporarily unavailable); use Option 2/3 until then.
 
 ### Option 2: pip install
 
@@ -35,7 +36,7 @@ cp .env.example .env
 # start.bat        # Windows
 ```
 
-All three are functionally identical. First launch fetches all sources (~1 min), then auto-refreshes every 4 hours.
+All three are functionally identical. First launch fetches all 31 sources in the background (~1 minute measured), then auto-refreshes every 4 hours.
 
 > **Security note**: The service listens on `127.0.0.1` by default. For LAN sharing, set `HOST=0.0.0.0` in `.env`. **Do not expose directly to the public internet** (no built-in auth; model keys stored locally). Use a reverse proxy with access control for public deployments.
 
@@ -47,7 +48,10 @@ All three are functionally identical. First launch fetches all sources (~1 min),
 - **19 Sources**: 10 base sources + 9 direct upstream sources extracted from AIHOT (OpenAI / DeepMind / Hacker News / Ars Technica etc.); **add any RSS feed from the settings UI** — zero code
 - **Bookmark = Archive**: Bookmarks save a full-text snapshot; content readable even after source link rots or 14-day cleanup
 - **Block / Not Interested**: Per-item ✕ button (URL / source / category); hot list and timeline respect blocks instantly
-- **Search**: Full-text search across titles, sources, and RSS summaries (SQLite FTS5)
+- **Search**: Chinese/CJK substring search across titles, translated titles, and summaries (LIKE path — the FTS tokenizer can't segment CJK); English full-text via SQLite FTS5 prefix matching, ranked by hotness
+- **Chinese Translation**: English titles/descriptions auto-translated in batches each cycle (Chinese shown as primary, original as subtitle); arXiv papers stay in English without consuming translation quota
+- **31 Sources**: 10 base sources + 21 direct upstreams — 9 extracted from AIHOT in v0.3.3/v0.3.4 (OpenAI / DeepMind / Hacker News / Ars Technica / IT之家 / VentureBeat / Tessl / GitHub Releases / MarkTechPost), the GitHub Star-rising source, 10 more added in the upstream-split batch (official RSS of Google Research / Microsoft Research / Azure AI / Mistral / NVIDIA / MIT + HTML scraping of Anthropic / Meta AI / xAI / Cohere), and the arXiv paper feed (cs.AI/CL/LG); **add any RSS feed from the settings UI** (intranet addresses blocked by default, SSRF-safe)
+- **GitHub Page** (/github): Trending / Releases / Star-rising sources in one view, with one-click Clone/Fork
 - **Push Notifications** (optional, off by default): Telegram Bot / WeCom group bot / Feishu custom bot / Generic Webhook — pushes hot list top N after each fetch cycle
 - **PWA**: Installable as a standalone app from your browser (with offline fallback)
 - **UX details**: Unread dots / unread-only filter / new-content banner / source filter chips / GitHub one-click Clone/Fork/Deploy / source health panel / dark mode / mobile responsive
