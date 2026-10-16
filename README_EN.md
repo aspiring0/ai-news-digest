@@ -1,4 +1,4 @@
-# AI News Digest (Open Source · v0.4)
+# AI News Digest (Open Source · v0.4.4)
 
 [中文文档](README.md) | **English**
 
