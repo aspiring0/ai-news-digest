@@ -48,7 +48,7 @@ chmod +x start.sh   # 只需做一次
 
 ```bash
 curl http://localhost:8000/api/health
-# 期望返回：{"ok": true, "version": "0.3.0", "news_count": 164, "last_fetch": "..."}
+# 期望返回：{"ok": true, "version": "0.4.4", "news_count": 164, "last_fetch": "..."}
 # news_count 为 0 说明首次抓取还没完成，等一两分钟再查
 ```
 
