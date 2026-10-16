@@ -266,11 +266,30 @@ def api_summary(request: Request, url: str, regenerate: int = 0):
 
 @app.get("/api/sources/health")
 def api_sources_health():
-    """各源最近一轮抓取健康状态（供 utility bar 指示与面板）。"""
+    """各源状态（v2 结构，清单 B2）：sources 为对象数组。
+
+    state ∈ failed（本轮抓取失败）/ processing（已入库、中文整理中）/
+    connected（正常）；meta 里的原始抓取结果结构不变（agent 工具与
+    告警逻辑直接读 meta，不受本 API 改版影响）。
+    """
     import json as _json
 
     raw = db.get_meta("source_health")
-    sources = _json.loads(raw) if raw else {}
+    health = _json.loads(raw) if raw else {}
+    item_counts = {r["source"]: r["count"] for r in db.stats()["by_source"]}
+    pending = db.pending_translation_counts()
+    sources = []
+    for name, info in health.items():
+        if not info.get("ok"):
+            state = "failed"
+            detail = str(info.get("error") or "失败")[:80]
+        elif pending.get(name):
+            state, detail = "processing", ""
+        else:
+            state = "connected"
+            detail = "0 条" if info.get("fetched", 0) == 0 else ""
+        sources.append({"key": name, "name": name, "state": state,
+                        "item_count": item_counts.get(name, 0), "detail": detail})
     return {"ok": True, "sources": sources}
 
 

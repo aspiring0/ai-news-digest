@@ -2,6 +2,24 @@
 
 ## 未发布
 
+功能：processing_status（清单 B 批，UI 五项最后一项）
+
+- **为什么**：对照用户真实前端规格（App.tsx），条目与来源需要"整理中"
+  中间态——英文条目入库后、中文翻译完成前，用户应看到明确的处理状态。
+- **做了什么**：
+  - **B1 条目级**：`_row_to_dict` 响应层实时计算（落点①，零 schema 变更）
+    ——英文标题且未翻译的条目带 `processing_status: "pending"`，翻译完成
+    自动消失；热榜/时间线等条目渲染「⏳ 整理中」徽标。arXiv 论文按设计
+    保持英文，不构成 pending。
+  - **B2 来源级**：`/api/sources/health` 升级 v2 结构——对象数组
+    `{key, name, state, item_count, detail}`，state ∈ failed（本轮抓取
+    失败）/ processing（已入库、中文整理中）/ connected；健康面板重写为
+    三态（指示条：N 个失败 / M 个整理中 / 全部已响应；processing 行显示
+    "· 整理中"）。meta 原始结构不变——agent 工具与连续异常告警直接读
+    meta，不受改版影响。
+- **测试**：+4（pending 判定四形态 / 热榜徽标渲染 / v2 三态与结构完整 /
+  0 条 detail）；模板契约测试更新为 v2 锚点（转义契约保留）。
+
 修复：中文搜索失效（C1）
 
 - **为什么**：FTS5 默认 unicode61 分词器把整段连续中文当一个 token，子串

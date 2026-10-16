@@ -3,6 +3,7 @@
   <div class="row-main">
     {% if rank is defined %}<span class="rank {{ 'r%d'|format(rank) if rank <= 3 else 'dim' }}" title="第 {{ rank }} 名">{{ '%02d'|format(rank) }}</span>{% endif %}
     {% if it.hot_score is defined %}<span class="score" title="{{ '故事热度（多源加成后）' if it._story is defined and it._story.count > 1 else '衰减热度分' }}">{{ "%.1f"|format(it.hot_score) }}</span>{% endif %}
+    {% if it.processing_status == "pending" %}<span class="story-badge" title="中文整理中：英文标题待翻译，完成后自动更新">⏳ 整理中</span>{% endif %}
     {% if it._story is defined and it._story.count > 1 %}<span class="story-badge" title="{{ it._story.sources|join(' / ') }}">⧉ {{ it._story.count }} 源报道</span>{% endif %}
     <a class="title" href="{{ it.url if it.url.startswith('http') else '#' }}" target="_blank" rel="noopener">{{ it.title_cn or it.title }}</a>
     <span class="spacer"></span>
