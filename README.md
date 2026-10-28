@@ -1,4 +1,4 @@
-# AI 资讯聚合（开源版 · v0.4.4）
+# AI 资讯聚合（开源版 · v0.4.5）
 
 **中文** | [English](README_EN.md)
 
@@ -19,6 +19,7 @@
 - **热榜**：时间衰减热度（48h 半衰）+ 每源配额（最多 4 席，防单源霸榜）+ **故事合并**（同一事件多源归一席，中英文跨语言匹配，多源报道热度加成）+ 进程内缓存（屏蔽/画像/入库自动失效，翻页秒开）+ 分页
 - **为我精选（自我进化）**：自动记录你的行为（点摘要/收藏/屏蔽）→ 一键 AI 蒸馏兴趣画像 → 喜欢的主题上浮、不感兴趣的消失；画像本地存储、可编辑可重置
 - **AI 摘要**：四段式中文解读（这是什么/关键事实/说人话/原文链接），按 URL 缓存；正文抓取失败自动回退 RSS 摘要
+- **AI 助手（Agent）**：右下角 💬 聊天抽屉——流式对话、搜索/热榜等 8 种工具、**写操作确认流**（收藏/屏蔽/加源先确认再执行）、跨会话持久化 + 会话列表 + 导出、开屏简报、条目「💬 讨论」一键带入上下文、斜杠命令；另带运行日志面板（文件持久化 + 轮转，设置页可查）
 - **中文翻译**：英文标题/描述每轮自动批量翻译为中文（主显中文、原文小字副行）；arXiv 论文保持英文不占翻译配额
 - **31 个信息源**：10 个基础源 + 21 个直接上游——v0.3.3/v0.3.4 从 AIHOT 拆出 9 个（OpenAI / DeepMind / Hacker News / Ars Technica / IT之家 / VentureBeat / Tessl / GitHub Releases / MarkTechPost）、GitHub Star 飙升源、拆上游续批 10 个（Google Research / Microsoft Research / Azure AI / Mistral / NVIDIA / MIT 六平台官方 RSS + Anthropic / Meta AI / xAI / Cohere 四厂商官网 HTML 抓取）、arXiv 论文流（cs.AI/CL/LG）；**设置页可零代码添加任意 RSS 源**（内网地址默认拦截，防 SSRF）
 - **GitHub 生态页**（/github）：Trending / Releases / Star 飙升三源独立呈现，条目自带一键 Clone/Fork
