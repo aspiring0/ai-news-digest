@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import agent as agent_mod, classifier, db, profile as profile_mod, providers, scheduler, summarizer
+from . import agent as agent_mod, classifier, db, profile as profile_mod, providers, scheduler, summarizer, updatecheck
 from .fetch_all import run_once
 from .logutil import setup_logging
 
@@ -605,3 +605,9 @@ def api_logs(lines: int = 100, level: str = "", module: str = ""):
     if module:
         result = [l for l in result if f"[{module}]" in l or module in l]
     return {"ok": True, "lines": result}
+
+
+@app.get("/api/update-check")
+def api_update_check():
+    """半自动更新检查：比对 GitHub Releases 最新版（进程内缓存 1h，失败静默）。"""
+    return updatecheck.check()

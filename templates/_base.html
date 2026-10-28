@@ -524,11 +524,40 @@ function markRead(url) {
         var wrap = document.querySelector(".wrap");
         var banner = document.createElement("div");
         banner.className = "new-banner";
-        banner.innerHTML = '<span>自上次到访新增 ' + fresh.length + ' 条内容</span><button>知道了</button>';
-        banner.querySelector("button").addEventListener("click", function () { banner.remove(); });
+        banner.innerHTML = '<span>自上次到访新增 ' + fresh.length + ' 条内容</span><button>知道了</button>';        banner.querySelector("button").addEventListener("click", function () { banner.remove(); });
         wrap.insertBefore(banner, wrap.firstChild);
       }
     }
+  } catch (e) {}
+})();
+
+/* ---------- 半自动更新检查：新版本横幅（下载 exe / 更新日志 / 本次忽略） ---------- */
+(function () {
+  try {
+    if (sessionStorage.getItem("updateDismissed")) return;
+    fetch("/api/update-check").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok || !d.has_update) return;
+      var wrap = document.querySelector(".wrap");
+      if (!wrap) return;
+      var escH = function (s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+          return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+        });
+      };
+      var banner = document.createElement("div");
+      banner.className = "new-banner";
+      banner.innerHTML =
+        '<span>🚀 新版本 v' + escH(d.latest) + ' 可用（当前 v' + escH(d.current) + '）</span>' +
+        '<a href="' + escH(d.download_url) + '" target="_blank" rel="noopener" style="margin-left:8px">下载 exe</a>' +
+        '<a href="' + escH(d.release_url) + '" target="_blank" rel="noopener" style="margin:0 8px">更新日志</a>' +
+        '<button>本次忽略</button>';
+      var btn = banner.querySelector("button");
+      if (btn) btn.addEventListener("click", function () {
+        sessionStorage.setItem("updateDismissed", "1");
+        banner.remove();
+      });
+      wrap.insertBefore(banner, wrap.firstChild);
+    });
   } catch (e) {}
 })();
 
