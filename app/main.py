@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -12,10 +13,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import classifier, db, profile as profile_mod, providers, scheduler, summarizer
+from . import agent as agent_mod, classifier, db, profile as profile_mod, providers, scheduler, summarizer
 from .fetch_all import run_once
+from .logutil import setup_logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+setup_logging()
 logger = logging.getLogger("ai-news-oss")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -522,3 +524,84 @@ def api_health():
         "news_count": total,
         "last_fetch": db.get_meta("last_fetch_run"),
     }
+
+
+# ---------------- v0.5：Agent 对话 ----------------
+
+# session_id 是客户端自报的会话标识，会原样入库并被前端渲染；
+# 必须限字符集，防止把 HTML/JS 注入到会话列表（存储型 XSS 载体）。
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _sanitize_session_id(raw) -> str | None:
+    """不合法的 session_id 一律当新会话处理（静默降级，兼容旧前端）。"""
+    sid = str(raw or "").strip()
+    return sid if _SESSION_ID_RE.fullmatch(sid) else None
+
+
+@app.post("/api/chat")
+def api_chat(payload: dict):
+    """Agent 对话（非流式，测试兼容）。"""
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
+    session_id = _sanitize_session_id(payload.get("session_id"))
+    result = agent_mod.run_agent(session_id, message)
+    status = 200 if result.get("ok") else (400 if "设置" in result.get("message", "") or "引擎" in result.get("message", "") else 502)
+    return JSONResponse(result, status_code=status)
+
+
+@app.post("/api/chat/stream")
+async def api_chat_stream(payload: dict):
+    """Agent 对话（SSE 流式）：工具调用过程实时推送。
+
+    安全/可用性：run_agent_stream 是同步生成器（内含阻塞的 requests 调用），
+    必须经 iterate_in_threadpool 桥接——每个 next() 在工作线程执行，
+    事件循环保持空闲。否则单次 LLM 调用（最坏 ~170s）会让全站停摆。
+    """
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+    from starlette.concurrency import iterate_in_threadpool
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"ok": False, "message": "消息不能为空"}, status_code=400)
+    session_id = _sanitize_session_id(payload.get("session_id"))
+    page_context = payload.get("page_context") or []
+
+    def event_lines():
+        for event in agent_mod.run_agent_stream(session_id, message, page_context):
+            yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(iterate_in_threadpool(event_lines()), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/chat/sessions")
+def api_chat_sessions():
+    """列出最近活跃的聊天会话。"""
+    return {"ok": True, "sessions": db.list_chat_sessions()}
+
+
+@app.get("/api/chat/history")
+def api_chat_history(session_id: str = ""):
+    return {"ok": True, "messages": agent_mod.get_history(session_id)}
+
+
+@app.delete("/api/chat")
+def api_chat_clear(session_id: str = ""):
+    agent_mod.clear_session(session_id)
+    return {"ok": True}
+
+
+@app.get("/api/logs")
+def api_logs(lines: int = 100, level: str = "", module: str = ""):
+    """查看最近日志。可按级别（WARNING/ERROR）或模块（agent/ai-news-oss等）过滤。"""
+    from .logutil import read_recent_logs
+
+    lines = max(1, min(lines, 500))
+    result = read_recent_logs(lines, level)
+    if module:
+        result = [l for l in result if f"[{module}]" in l or module in l]
+    return {"ok": True, "lines": result}

@@ -141,6 +141,21 @@ def init_db() -> None:
             )
             """
         )
+        # v0.5：Agent 聊天持久化（跨会话/跨重启）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                tool_calls TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id)")
+
         # v0.4.1：全文搜索（FTS5，标题/来源/RSS 摘要），触发器保持同步 + 存量回填
         conn.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS news_items_fts USING fts5"
@@ -631,6 +646,45 @@ def recent_interactions(limit: int = 500) -> list[dict]:
             "SELECT * FROM interactions ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------------- v0.5：Agent 聊天持久化 ----------------
+
+def save_chat_message(session_id: str, role: str, content: str, tool_calls: str | None = None) -> None:
+    """存一条聊天消息（用户或助手）。"""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO chat_messages (session_id, role, content, tool_calls, created_at)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (session_id, role, content[:4000], tool_calls, _iso(datetime.now(timezone.utc))),
+        )
+
+
+def get_chat_messages(session_id: str, limit: int = 50) -> list[dict]:
+    """取某会话的消息（按时间正序）。"""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT role, content, tool_calls FROM chat_messages"
+            " WHERE session_id = ? ORDER BY id ASC LIMIT ?",
+            (session_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_chat_sessions(limit: int = 20) -> list[dict]:
+    """列出最近活跃的会话（最后一条消息时间倒序）。"""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT session_id, COUNT(*) as msg_count, MAX(created_at) as last_at"
+            " FROM chat_messages GROUP BY session_id ORDER BY last_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_chat_session(session_id: str) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
 
 # ---------------- v0.2：摘要缓存 ----------------
 

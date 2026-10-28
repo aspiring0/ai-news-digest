@@ -148,6 +148,12 @@
   .sum-btn{ flex-shrink:0; border:none; background:none; color:var(--blue); border-radius:0;
             border-bottom:1px dashed var(--blue); padding:0 0 1px; font-size:12.5px; cursor:pointer; font-family:inherit; }
   .sum-btn:hover{ color:var(--blue-dark); }
+  .discuss-btn{
+    flex-shrink:0; border:none; background:none; color:var(--blue);
+    border-bottom:1px dashed transparent; padding:0 0 1px; font-size:12px;
+    cursor:pointer; font-family:inherit; transition: border-color .15s;
+  }
+  .discuss-btn:hover{ border-bottom-color:var(--blue); color:var(--blue-dark); }
   .row-main .spacer{ flex:1; }
   .meta{ color:var(--muted); font-size:12px; }
   .meta b{ color:var(--text); font-weight:600; }
@@ -274,6 +280,7 @@
 {% block content %}{% endblock %}
 </main>
 {% include "_summary_modal.html" %}
+{% include "_chat_widget.html" %}
 
 <!-- 设置抽屉：iframe 承载 /settings 全部功能（零接口依赖） -->
 <div class="drawer-mask" id="drawer-mask"></div>

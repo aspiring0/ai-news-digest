@@ -92,5 +92,7 @@ def clean_db():
         conn.execute("DELETE FROM provider_settings")
         conn.execute("DELETE FROM blocks")
         conn.execute("DELETE FROM custom_sources")
+        conn.execute("DELETE FROM bookmarks")        # toggle 语义对初始状态敏感，必须清
+        conn.execute("DELETE FROM chat_messages")    # Agent 会话测试隔离
     db._hot_cache["key"] = None  # 跨测试缓存隔离
     return db

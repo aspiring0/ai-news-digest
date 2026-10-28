@@ -214,6 +214,32 @@ P3 清理（审计 P3 批）
 - **测试**：+4 用例（异址拒发且零请求 / custom 同址回退 / 自带 key 异址放行 /
   test_connection 不触存储）。
 
+安全修复：Agent 门槛批（审计 P0-2 / P1-2a-c / P1-3，feature/agent 分支）
+
+- **为什么**：① `/api/chat/stream` 在事件循环线程上跑同步 Agent 生成器，
+  单次 LLM 调用最坏 ~170 秒，期间全站（页面/健康检查/其他会话）停摆；
+  ② 聊天组件三处 XSS 残留——LLM 输出的 markdown 链接不过滤 URL scheme
+  （`javascript:` 可执行）、客户端自报的 session_id 与画像 likes 关键词未
+  转义直接进 innerHTML（无鉴权 API 均可写入，构成存储型 XSS）；
+  ③ 确认流工程缺口——pending 确认无过期、确认条参数截断 50 字符与实际
+  执行参数不一致、bookmark 切换语义不向用户明示。
+- **做了什么**：
+  - 流式端点改 `iterate_in_threadpool` 桥接，阻塞迭代挪到工作线程，
+    SSE 输出格式不变（测试断言生成器线程 ≠ 事件循环线程）。
+  - 两个 chat 端点对 session_id 校验 `^[A-Za-z0-9_-]{1,64}$`，不合法
+    静默当新会话；前端 data-sid 兜底转义（兼容存量脏数据）。
+  - 新增 `safeHref`（仅 http(s)/协议相对/站内相对可进 href，其余降级 #），
+    单点收口 mdToHtml 链接、sources 两处、摘要弹窗原文链接；
+    建议 chips 重构为 textContent + addEventListener（废除内联 onclick 拼接）。
+  - `_pending_actions` 带 10 分钟 TTL；确认条完整展示执行参数；
+    bookmark 确认文案按当前状态明示「收藏/取消收藏」，工具 schema 标注切换语义。
+  - conftest clean_db 补清 bookmarks/chat_messages（toggle 语义对初始状态
+    敏感，此前跨用例状态泄漏导致测试误报）。
+- **边界声明**：确认流是 UX 机制而非安全边界（无鉴权模型下写 API 本就
+  开放），代确认风险的真正解法是鉴权，属产品决策；prompt 注入面靠确认流
+  拦截的现状不变。前端无 JS 测试设施，XSS 修复以静态契约测试锁定 +
+  人工验收。
+
 ## v0.4.2（2026-10-13）
 
 PWA / 推送通知 / 英文 README

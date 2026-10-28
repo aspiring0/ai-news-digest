@@ -204,6 +204,21 @@ if (window.self !== window.top) { document.documentElement.classList.add("in-dra
   </div>
 </details>
 
+<details class="panel">
+  <summary>运行日志（最近 100 行，重启不丢）</summary>
+  <div class="panel-body">
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      <button class="btn" onclick="loadLogs(100)">全部 100 行</button>
+      <button class="btn" onclick="loadLogs(100, '', 'agent')">Agent 日志</button>
+      <button class="btn" onclick="loadLogs(100, 'WARNING')">仅 WARNING+</button>
+      <button class="btn" onclick="loadLogs(100, 'ERROR')">仅 ERROR</button>
+    </div>
+    <div id="log-view" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:monospace;font-size:11px;line-height:1.5;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px">
+      <span style="color:var(--muted)">点上面按钮加载…</span>
+    </div>
+  </div>
+</details>
+
 <details class="panel" open>
   <summary>自定义 provider（任意 OpenAI-compatible 地址）</summary>
   <div class="panel-body">
@@ -465,5 +480,26 @@ async function testPush() {
   msg.className = "msg " + (d.ok ? "ok" : "err");
 }
 loadPushUI();
+
+/* ---------- 运行日志 ---------- */
+async function loadLogs(lines, level, module) {
+  const box = document.getElementById("log-view");
+  box.innerHTML = '<span style="color:var(--muted)">加载中…</span>';
+  let url = "/api/logs?lines=" + (lines || 100);
+  if (level) url += "&level=" + level;
+  if (module) url += "&module=" + module;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    if (d.ok && d.lines.length) {
+      box.textContent = d.lines.join("\n");
+      box.scrollTop = 0;
+    } else {
+      box.innerHTML = '<span style="color:var(--muted)">暂无日志</span>';
+    }
+  } catch (e) {
+    box.innerHTML = '<span style="color:var(--muted)">加载失败</span>';
+  }
+}
 </script>
 {% endblock %}
