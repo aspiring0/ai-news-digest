@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>草稿 2 · 数据面板 Dashboard</title>
+<style>
+  :root{ --bg:#eef2f7; --card:#fff; --line:#e2e8f0; --ink:#0f172a; --mut:#64748b;
+         --blue:#2563eb; --bluebg:#eff6ff; --hot:#b45309; --hotbg:#fef3c7; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.55}
+  header{background:var(--card);border-bottom:1px solid var(--line)}
+  .h-in{max-width:1060px;margin:0 auto;padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .brand{font-weight:800;font-size:16px}
+  .brand span{color:var(--blue)}
+  nav{display:flex;gap:2px}
+  nav a{padding:6px 11px;border-radius:8px;color:var(--mut);text-decoration:none;font-size:13px}
+  nav a.on{background:var(--bluebg);color:var(--blue);font-weight:700}
+  nav a em{font-style:normal;background:var(--line);border-radius:99px;font-size:10px;padding:0 6px;margin-left:4px;color:var(--mut)}
+  .btn{border:1px solid var(--line);background:var(--card);border-radius:8px;height:32px;padding:0 10px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+  .util{background:var(--card);border-bottom:1px solid var(--line)}
+  .u-in{max-width:1060px;margin:0 auto;padding:5px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:5px;animation:pp 2s infinite}
+  @keyframes pp{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  .u-in .pill{border:1px solid var(--line);border-radius:99px;padding:2px 10px;cursor:pointer;color:var(--ink)}
+  .grid{max-width:1060px;margin:14px auto;padding:0 16px;display:grid;grid-template-columns:1fr 264px;gap:14px;align-items:start}
+  /* lead 卡 */
+  .lead{background:linear-gradient(120deg,var(--bluebg),var(--card) 65%);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;gap:14px;margin-bottom:12px}
+  .lead .k{font-size:10px;font-weight:800;letter-spacing:.18em;color:var(--blue)}
+  .lead h1{font-size:17.5px;margin:4px 0 6px;line-height:1.4}
+  .lead h1 a{color:var(--ink);text-decoration:none}
+  .lead .st{font-size:12.5px;color:var(--mut);margin:0 0 8px}
+  .lead .why{border:none;background:var(--blue);color:#fff;border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer}
+  .lead .sb{flex-shrink:0;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:6px 14px;text-align:center}
+  .lead .sb small{font-size:10px;color:var(--mut);display:block}
+  .lead .sb b{font-size:22px;color:var(--hot);font-variant-numeric:tabular-nums}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .chips b{border-radius:99px;border:1px solid var(--line);background:var(--card);padding:3px 10px;font-weight:500;font-size:12px;color:var(--mut);cursor:pointer}
+  .chips b.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  .chips i{font-style:normal;color:#94a3b8;font-size:11px;margin-left:3px}
+  /* 条目卡 */
+  .item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+  .rk{flex-shrink:0;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;background:#94a3b8}
+  .rk.g1{background:linear-gradient(135deg,#f59e0b,#d97706)}.rk.g2{background:linear-gradient(135deg,#94a3b8,#64748b)}
+  .rk.g3{background:linear-gradient(135deg,#d9a06c,#b45309)}
+  .bd{flex:1;min-width:0}
+  .t{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .t a{color:var(--ink);text-decoration:none}
+  .t a:hover{color:var(--blue)}
+  .cb{font-size:10px;font-weight:700;border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+  .cb.m{background:#dbeafe;color:#1d4ed8}.cb.a{background:#dcfce7;color:#15803d}
+  .cb.p{background:#ede9fe;color:#6d28d9}.cb.f{background:#ffedd5;color:#c2410c}
+  .m{font-size:11px;color:var(--mut);margin-top:2px}
+  .sc{flex-shrink:0;text-align:right}
+  .sc b{display:block;background:var(--hotbg);color:var(--hot);border-radius:6px;padding:1px 8px;font-size:12.5px;font-variant-numeric:tabular-nums}
+  .sc a{font-size:11px;color:var(--blue);text-decoration:none}
+  /* 侧栏 */
+  aside{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .panel h3{margin:0 0 8px;font-size:12px;letter-spacing:.08em;color:var(--mut)}
+  .mini{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+  .mini:last-child{border-bottom:none}
+  .mini b{color:#cbd5e1;font-variant-numeric:tabular-nums;width:16px}
+  .mini span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);text-decoration:none}
+  .mini em{font-style:normal;color:var(--hot);font-size:11.5px;font-variant-numeric:tabular-nums}
+  .bar{display:flex;align-items:center;gap:8px;font-size:12px;margin:5px 0}
+  .bar i{font-style:normal;width:76px;color:var(--mut);flex-shrink:0}
+  .bar u{flex:1;height:6px;border-radius:99px;background:var(--bg);text-decoration:none;position:relative}
+  .bar u b{position:absolute;inset:0;border-radius:99px;background:var(--blue)}
+  .bar em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink);width:22px;text-align:right}
+  .fp{display:flex;flex-direction:column;gap:6px}
+  .fp b{border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:500;color:var(--mut);cursor:pointer}
+  .fp b.on{background:var(--bluebg);color:var(--blue);border-color:var(--blue)}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} aside{position:static} }
+</style>
+</head>
+<body>
+<header>
+  <div class="h-in">
+    <div class="brand">AI<span>·</span>NEWS</div>
+    <nav><a class="on" href="#">热榜 <em>20</em></a><a href="#">时间线 <em>188</em></a><a href="#">日报</a><a href="#">分类</a><a href="#">收藏</a></nav>
+    <span><button class="btn">⚙ 设置</button> <button class="btn">🌙</button></span>
+  </div>
+</header>
+<div class="util"><div class="u-in">
+  <span><span class="dot"></span>更新于 18 分钟前 · 下一轮 3h42m 后</span>
+  <span><span class="pill">当前：DeepSeek · deepseek-chat ›</span> &nbsp; ↻ 刷新</span>
+</div></div>
+
+<div class="grid">
+  <main>
+    <section class="lead">
+      <div style="flex:1;min-width:0">
+        <div class="k">AI / NOW · 高信号 AI 资讯流</div>
+        <h1><a href="#">Meta 发布 Muse Wonder 系列前沿模型，登陆 Agent Arena 首测</a></h1>
+        <p class="st">Muse Wonder 与 Wonder Full 今日开放 API，官方称迄今最强双能模型，Arena 分数即将公布。</p>
+        <button class="why">为什么重要 · AI 解读 →</button>
+      </div>
+      <div class="sb"><small>衰减热度</small><b>70.4</b></div>
+    </section>
+    <div class="chips">
+      <b class="on">全部 <i>20</i></b><b>AIHOT <i>5</i></b><b>HuggingFace <i>4</i></b><b>GitHub <i>3</i></b><b>TechCrunch <i>3</i></b><b>量子位 <i>2</i></b>
+    </div>
+    <div class="item"><span class="rk g1">1</span><div class="bd"><div class="t"><span class="cb m">模型</span><a href="#">Meta 发布 Muse Wonder 系列前沿模型</a></div><div class="m">AIHOT · 08:09 · 1 小时前</div></div><div class="sc"><b>70.4</b><a href="#">汇总 →</a></div></div>
+    <div class="item"><span class="rk g2">2</span><div class="bd"><div class="t"><span class="cb a">应用</span><a href="#">xAI 推出 The X Subscription，Cursor 并入其中</a></div><div class="m">AIHOT · 06:56 · 3 小时前</div></div><div class="sc"><b>64.1</b><a href="#">汇总 →</a></div></div>
+    <div class="item"><span class="rk g3">3</span><div class="bd"><div class="t"><span class="cb f">行业</span><a href="#">微软发布 Maia 300，2027 年扩至多吉瓦级部署</a></div><div class="m">AIHOT · 05:57 · 4 小时前</div></div><div class="sc"><b>58.9</b><a href="#">汇总 →</a></div></div>
+    <div class="item"><span class="rk">4</span><div class="bd"><div class="t"><span class="cb m">模型</span><a href="#">Qwen3.8-27B · HuggingFace 热门模型（12.4k likes）</a></div><div class="m">HuggingFace · 16:05 · 1 小时前</div></div><div class="sc"><b>52.3</b><a href="#">汇总 →</a></div></div>
+    <div class="item"><span class="rk">5</span><div class="bd"><div class="t"><span class="cb p">论文</span><a href="#">AWS priming 方法：预训练 Transformer 改混合架构，成本降 99%</a></div><div class="m">AIHOT · 01:48 · 9 小时前</div></div><div class="sc"><b>44.7</b><a href="#">汇总 →</a></div></div>
+  </main>
+
+  <aside>
+    <div class="panel">
+      <h3>热度 TOP 5</h3>
+      <div class="mini"><b>1</b><span>Muse Wonder 系列前沿模型发布</span><em>70.4</em></div>
+      <div class="mini"><b>2</b><span>The X Subscription 整合 Cursor</span><em>64.1</em></div>
+      <div class="mini"><b>3</b><span>微软 Maia 300 多吉瓦部署</span><em>58.9</em></div>
+      <div class="mini"><b>4</b><span>Qwen3.8-27B 热门模型</span><em>52.3</em></div>
+      <div class="mini"><b>5</b><span>AWS priming 混合架构论文</span><em>44.7</em></div>
+    </div>
+    <div class="panel">
+      <h3>来源分布（188 条）</h3>
+      <div class="bar"><i>AIHOT</i><u><b style="width:100%"></b></u><em>30</em></div>
+      <div class="bar"><i>ProductHunt</i><u><b style="width:96%"></b></u><em>29</em></div>
+      <div class="bar"><i>量子位</i><u><b style="width:66%"></b></u><em>20</em></div>
+      <div class="bar"><i>TechCrunch</i><u><b style="width:66%"></b></u><em>20</em></div>
+      <div class="bar"><i>HuggingFace</i><u><b style="width:50%"></b></u><em>15</em></div>
+    </div>
+    <div class="panel">
+      <h3>快捷筛选</h3>
+      <div class="fp"><b class="on">全部来源</b><b>仅新闻源</b><b>仅模型/仓库</b><b>今日已看过</b></div>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

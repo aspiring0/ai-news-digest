@@ -1,0 +1,48 @@
+﻿........................................................................ [ 58%]
+....................................................                     [100%]
+=============================== tests coverage ================================
+______________ coverage: platform win32, python 3.11.15-final-0 _______________
+
+Name                              Stmts   Miss  Cover   Missing
+---------------------------------------------------------------
+app\__init__.py                       1      0   100%
+app\agent.py                        250     69    72%   91-92, 179, 187, 190-191, 235-242, 248-251, 270-271, 295, 313-314, 317-319, 346-347, 365-366, 374-388, 397-440
+app\classifier.py                    17      0   100%
+app\db.py                           290     20    93%   88, 184, 194-195, 229-230, 343, 352-353, 418-419, 430-431, 467, 490, 493, 600-601, 628-629
+app\fetch_all.py                     56      7    88%   68-70, 87-88, 99-100
+app\fetchers\__init__.py              3      0   100%
+app\fetchers\aihot.py                 6      1    83%   15
+app\fetchers\ars_technica.py          6      1    83%   10
+app\fetchers\base.py                 52      5    90%   46, 48, 63, 81-82
+app\fetchers\deepmind.py              6      1    83%   10
+app\fetchers\github_releases.py      17     10    41%   22-31
+app\fetchers\github_trending.py      37     28    24%   22-62
+app\fetchers\hn_ai.py                 6      1    83%   10
+app\fetchers\huggingface.py          29     20    31%   21-53
+app\fetchers\ithome.py               11      0   100%
+app\fetchers\marktechpost.py          6      1    83%   10
+app\fetchers\openai_news.py           6      1    83%   10
+app\fetchers\ossinsight.py           32     23    28%   21-61
+app\fetchers\producthunt.py           9      1    89%   21
+app\fetchers\qbitai.py                6      1    83%   10
+app\fetchers\rundown.py               6      1    83%   10
+app\fetchers\superhuman.py            6      1    83%   14
+app\fetchers\techcrunch.py            6      1    83%   10
+app\fetchers\tessl.py                 6      1    83%   10
+app\fetchers\thebatch.py              6      1    83%   14
+app\fetchers\tldr.py                  6      1    83%   10
+app\fetchers\venturebeat.py           6      1    83%   10
+app\launcher.py                      32     32     0%   6-50
+app\logutil.py                       35      6    83%   30-32, 51, 55-56
+app\main.py                         304     63    79%   46-47, 141-142, 195, 203, 239-240, 254-255, 300-308, 313-325, 330-335, 371, 390-391, 396-400, 406-412, 418, 435, 459, 469-487, 494, 516
+app\profile.py                       90      9    90%   41-42, 44, 77, 103-105, 113-114
+app\providers.py                    116     29    75%   59, 118, 159-160, 164-168, 172-174, 191, 199, 203-204, 209-231
+app\push.py                          76      8    89%   31-32, 79, 87, 95, 102, 107, 110
+app\scheduler.py                     12      3    75%   20-30
+app\scorer.py                        19      1    95%   50
+app\stories.py                       62      3    95%   55, 63, 65
+app\summarizer.py                    86     60    30%   31-38, 42-52, 60, 67, 69, 73-74, 79-119, 127-146
+app\translator.py                    67     28    58%   37, 45-86, 111
+---------------------------------------------------------------
+TOTAL                              1787    439    75%
+124 passed in 10.50s

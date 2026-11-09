@@ -1,0 +1,198 @@
+{
+  "aihot": {
+    "url": "https://aihot.news",
+    "ok": true,
+    "title": "",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "textColor": "rgb(0, 0, 0)",
+    "font": "\"Times New Roman\"",
+    "baseFontSize": "16px",
+    "linkColor": null,
+    "maxContentW": 1280,
+    "itemCandidates": [],
+    "samples": [],
+    "imgAboveFold": 0,
+    "scrollW": 1280
+  },
+  "hackernews": {
+    "url": "https://news.ycombinator.com",
+    "ok": true,
+    "title": "Hacker News",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "textColor": "rgb(130, 130, 130)",
+    "font": "Verdana, Geneva, sans-serif",
+    "baseFontSize": "13.3333px",
+    "linkColor": "rgb(0, 0, 0)",
+    "maxContentW": 1264,
+    "maxContentEl": "CENTER.",
+    "itemCandidates": [
+      [
+        "TR.athing",
+        30
+      ]
+    ],
+    "firstItem": {
+      "h": 19,
+      "text": "1. The baffling intelligence of a single cell (2024) (jsomers.net)"
+    },
+    "imgAboveFold": 0,
+    "scrollW": 1280
+  },
+  "techcrunch": {
+    "url": "https://techcrunch.com/category/artificial-intelligence/",
+    "ok": true,
+    "title": "AI News & Artificial Intelligence | TechCrunch",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "textColor": "rgb(33, 38, 35)",
+    "font": "nb_international_proregular, sans-serif",
+    "baseFontSize": "19px",
+    "header": {
+      "h": 68,
+      "bg": "rgba(0, 0, 0, 0)",
+      "pos": "relative"
+    },
+    "headerText": "TechCrunch Desktop Logo TechCrunch Mobile Logo LatestStartupsVentureAppleSecurityAIAppsDisrupt 2026 EventsPodc",
+    "linkColor": "rgb(10, 137, 53)",
+    "maxContentW": 1280,
+    "maxContentEl": "DIV.",
+    "itemCandidates": [
+      [
+        "A.loop-card__author",
+        40
+      ],
+      [
+        "LI.wp-block-post",
+        37
+      ],
+      [
+        "DIV.wp-block-techcrunch-card",
+        37
+      ],
+      [
+        "DIV.loop-card",
+        37
+      ],
+      [
+        "DIV.loop-card__content",
+        37
+      ],
+      [
+        "H3.loop-card__title",
+        37
+      ]
+    ],
+    "firstItem": {
+      "h": 18,
+      "text": "Russell Brandom"
+    },
+    "imgAboveFold": 3,
+    "scrollW": 1280
+  },
+  "36kr": {
+    "url": "https://36kr.com",
+    "ok": true,
+    "title": "36氪_让一部分人先看到未来",
+    "bodyBg": "rgb(255, 255, 255)",
+    "textColor": "rgba(0, 0, 0, 0.65)",
+    "font": "\"PingFang SC\", \"Lantinghei SC\", \"Helvetica Neue\", Helvetica, Arial, \"Microsoft YaHei\", 微软雅",
+    "baseFontSize": "16px",
+    "header": {
+      "h": 44,
+      "bg": "rgb(59, 59, 59)",
+      "pos": "fixed"
+    },
+    "headerText": "账号设置我的关注我的收藏申请的项目退出登录登录搜索36氪Auto数字时氪未来消费智能涌现未来城市启动Power on36氪出海36氪研究院潮生TIDE36氪企服点评36氪财经职场bonus36碳后浪研究所暗涌Waves硬",
+    "linkColor": "rgb(38, 38, 38)",
+    "maxContentW": 1280,
+    "maxContentEl": "DIV.",
+    "itemCandidates": [
+      [
+        "DIV.kr-shadow-wrapper-card",
+        41
+      ],
+      [
+        "DIV.kr-home-flow-item",
+        40
+      ],
+      [
+        "DIV.kr-flow-article-item",
+        36
+      ],
+      [
+        "DIV.article-item-pic-wrapper",
+        36
+      ],
+      [
+        "A.article-item-pic",
+        36
+      ],
+      [
+        "DIV.article-item-info",
+        36
+      ]
+    ],
+    "firstItem": {
+      "h": 173,
+      "text": ""
+    },
+    "imgAboveFold": 17,
+    "scrollW": 1280
+  },
+  "producthunt": {
+    "url": "https://www.producthunt.com",
+    "ok": true,
+    "title": "请稍候…",
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "textColor": "rgb(49, 49, 49)",
+    "font": "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial,",
+    "baseFontSize": "16px",
+    "linkColor": "rgb(0, 0, 238)",
+    "maxContentW": 1280,
+    "itemCandidates": [],
+    "samples": [],
+    "imgAboveFold": 0,
+    "scrollW": 1280
+  },
+  "qbitai": {
+    "url": "https://www.qbitai.com",
+    "ok": true,
+    "title": "量子位 – 追踪人工智能新趋势，报道科技行业新突破",
+    "bodyBg": "rgb(255, 255, 255)",
+    "textColor": "rgb(33, 37, 41)",
+    "font": "sans-serif",
+    "baseFontSize": "12px",
+    "header": {
+      "h": 76,
+      "bg": "rgb(255, 255, 255)",
+      "pos": "fixed"
+    },
+    "headerText": "首页 资讯 智能车 智库 活动 MEET大会 AIGC 扫码关注量子位 // $('.biaojiwei').click(function(){ $('.biaojiwei').click(function(event)",
+    "linkColor": "rgb(51, 51, 51)",
+    "maxContentW": 1280,
+    "maxContentEl": "HEADER.top",
+    "itemCandidates": [
+      [
+        "IMG.attachment-744x136",
+        26
+      ],
+      [
+        "LI.menu-item",
+        7
+      ],
+      [
+        "IMG.attachment-thumbnail",
+        5
+      ],
+      [
+        "IMG.attachment-368x316",
+        1
+      ]
+    ],
+    "firstItem": {
+      "h": 317,
+      "text": ""
+    },
+    "imgAboveFold": 14,
+    "scrollW": 1280
+  }
+}

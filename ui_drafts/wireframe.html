@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>UI 线框图 · 低保真框架</title>
+<style>
+  :root{ --ln:#9ca3af; --fill:#e5e7eb; --lab:#111827; --note:#dc2626; --bg:#fff; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#fafafa;color:var(--lab);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;line-height:1.5;padding:24px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#6b7280;font-size:12px;margin:0 0 20px}
+  .sec{background:var(--bg);border:1px solid #d1d5db;border-radius:10px;padding:16px;margin-bottom:22px}
+  .sec > h2{font-size:15px;margin:0 0 2px;border-bottom:2px solid var(--lab);padding-bottom:6px}
+  .sec .desc{font-size:11.5px;color:#6b7280;margin:4px 0 12px}
+  .frame{border:2px dashed var(--ln);border-radius:6px;padding:10px;background:#fff}
+  .row{display:flex;gap:10px}
+  .box{border:1.5px dashed var(--ln);border-radius:4px;padding:6px 8px;color:#374151;font-size:11px;position:relative;background:#fff}
+  .box .t{font-weight:700;font-size:10.5px;letter-spacing:.05em;color:#111}
+  .fill{background:var(--fill);border-radius:2px;height:8px;margin:4px 0}
+  .fill.s{width:45%}.fill.m{width:68%}.fill.l{width:90%}
+  .note{color:var(--note);font-size:11px;line-height:1.55}
+  .grid-note{display:grid;grid-template-columns:1fr 300px;gap:16px}
+  .anno{border-left:2px solid var(--note);padding-left:10px}
+  .anno b{color:var(--note)}
+  .anno p{margin:0 0 8px;font-size:11.5px;color:#374151}
+  .mask{position:relative}
+  .ghost{position:absolute;inset:0;background:rgba(17,24,39,.06);display:flex;align-items:center;justify-content:center;
+         color:#6b7280;font-size:11px;border:1.5px dashed var(--ln);border-radius:4px}
+  .arrow{color:var(--ln);text-align:center;font-size:11px;margin:2px 0}
+  .cols{display:flex;gap:10px;align-items:stretch}
+  .tag{display:inline-block;border:1px solid var(--ln);border-radius:3px;font-size:10px;padding:0 5px;margin:1px 2px;color:#4b5563}
+</style>
+</head>
+<body>
+<h1>AI 资讯聚合 · UI 线框框架</h1>
+<p class="sub">低保真：灰虚线=容器边界，灰条=文本占位，红字=设计说明。适用于全部 6 页 + 弹窗 + 抽屉。</p>
+
+<!-- ============ 1. 全局骨架 ============ -->
+<section class="sec">
+  <h2>① 全局骨架（所有页面共用）</h2>
+  <p class="desc">宽 900px 居中 · 顶栏 + utility bar + 内容区 · 右侧抽屉浮层</p>
+  <div class="grid-note">
+    <div class="frame">
+      <div class="box" style="display:flex;justify-content:space-between;align-items:center">
+        <span><b>AI 资讯聚合</b>（品牌·左）</span>
+        <span class="tag">今日热榜</span><span class="tag">时间线</span><span class="tag">日报</span><span class="tag">分类</span><span class="tag">收藏</span>
+        <span>⚙ 设置 · 🌙</span>
+      </div>
+      <div class="arrow">│ 顶栏（下边框，非吸顶可改吸顶）</div>
+      <div class="box" style="display:flex;justify-content:space-between">
+        <span>● 更新于 18 分钟前 · 共 188 条</span>
+        <span>[当前：DeepSeek · deepseek-chat ›]　↻ 刷新</span>
+      </div>
+      <div class="arrow">│ utility bar（呼吸点 / 引擎胶囊 / 刷新）</div>
+      <div class="box" style="min-height:120px;margin-top:6px">
+        <div class="t">主内容区（各页不同，见下）</div>
+        <div class="fill l"></div><div class="fill m"></div><div class="fill s"></div>
+      </div>
+      <div class="arrow">│</div>
+      <div class="box" style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af">
+        <span>页脚：每 4 小时刷新 · 保留 14 天</span><span>深/浅色 · 抽屉开关</span>
+      </div>
+    </div>
+    <div class="anno">
+      <p><b>顶栏</b>：品牌左、5 个纯文本 tab 中、设置/主题按钮右；当前 tab 底线或色块高亮。</p>
+      <p><b>utility bar</b>：左侧绿点+更新时间（/api/health）；右侧引擎胶囊点击开抽屉；刷新=重载页面（可升级为触发重抓）。</p>
+      <p><b>设置抽屉</b>：480px 右滑浮层，iframe 承载 /settings；遮罩/Esc 关闭。</p>
+      <p><b>响应式</b>：≤640px 顶栏换行、内容区全宽、抽屉全屏。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. 热榜页 ============ -->
+<section class="sec">
+  <h2>② 热榜页（/hot）</h2>
+  <p class="desc">lead 头条区 → 来源 chips → 排名条目 ×20 → 分页（待后端）</p>
+  <div class="grid-note">
+    <div class="frame">
+      <div class="box cols">
+        <div style="flex:1">
+          <div class="t">AI / NOW · 高信号 AI 资讯流（kicker 小标语）</div>
+          <div class="fill l" style="height:12px"></div>
+          <div class="t" style="margin-top:4px">头条标题 = 第 1 名条目（衬线大字，跳原文）</div>
+          <span class="tag">为什么重要 · AI 解读 →</span>
+        </div>
+        <div class="box" style="width:110px;text-align:center">
+          <div class="t">衰减热度</div><div class="fill" style="width:60%;height:16px;margin:4px auto"></div>
+        </div>
+      </div>
+      <div class="arrow">│ lead strip（渐变底 + 右侧分数盒）</div>
+      <div class="box">
+        <span class="tag">全部 20</span><span class="tag">AIHOT 4</span><span class="tag">量子位 4</span><span class="tag">HF 4</span><span class="tag">GitHub 4</span><span class="tag">…</span>
+      </div>
+      <div class="arrow">│ 来源 chips（选中高亮，纯前端过滤）· 注：配额后每源 ≤4</div>
+      <div class="box cols">
+        <div class="box" style="width:30px;text-align:center"><b>01</b></div>
+        <div style="flex:1">
+          <div class="row"><span class="tag">模型发布</span><div class="fill m" style="flex:1"></div></div>
+          <div class="fill s"></div>
+        </div>
+        <div class="box" style="width:56px;text-align:center">70.4</div>
+        <div class="box" style="width:24px;text-align:center">☆</div>
+      </div>
+      <div class="box cols" style="margin-left:40px">
+        <span class="tag">点开汇总 →</span><span class="fill s" style="flex:1"></span><span class="tag">来源 · 08:09 · 1 小时前</span>
+      </div>
+      <div class="arrow">│ 条目 = 主行（排名+badge+分数+标题+☆）+ 副行（汇总按钮+meta）</div>
+      <div class="box" style="opacity:.55">… 重复 02-20（前三名金银铜徽标，其余灰底编号）</div>
+      <div class="box" style="text-align:center;margin-top:6px">← 上一页 · 第 1 / N 页 · 下一页 →（分页待后端支持）</div>
+    </div>
+    <div class="anno">
+      <p><b>排名</b>：01-20 全量编号；前三彩色渐变徽标。</p>
+      <p><b>badge</b>：前端分类器 6 类彩色标签（与 classifier.py 同步）。</p>
+      <p><b>标题跳原文</b>（新窗）；汇总入口独立在副行。</p>
+      <p><b>多样性配额</b>（待批准后端）：每源最多 4 条进榜，修复"AIHOT 等新闻源进不了热榜"的问题（当前 AIHOT 最高第 48 名）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. 摘要弹窗 ============ -->
+<section class="sec">
+  <h2>③ 摘要弹窗（点「点开汇总」触发）</h2>
+  <p class="desc">居中模态 · 引擎条 + 编号四段 · 失败态有重试</p>
+  <div class="grid-note">
+    <div class="frame" style="max-width:560px;margin:0 auto">
+      <div class="box cols">
+        <div class="fill m" style="flex:1"></div><div class="box" style="width:24px;text-align:center">✕</div>
+      </div>
+      <div class="box" style="display:flex;justify-content:space-between;margin-top:6px">
+        <span>当前：DeepSeek · deepseek-chat</span><span>更换 ›</span>
+      </div>
+      <div class="arrow">│ 引擎条（未配置时显示「设置模型 ›」）</div>
+      <div class="box"><b>01 这是什么</b><div class="fill l"></div></div>
+      <div class="box" style="margin-top:4px"><b>02 关键事实</b>
+        <div class="fill l"></div><div class="fill l" style="margin-left:14px"></div><div class="fill m" style="margin-left:14px"></div>
+      </div>
+      <div class="box" style="margin-top:4px"><b>03 说人话</b><div class="fill l"></div><div class="fill m"></div></div>
+      <div class="box" style="margin-top:4px"><b>04 原文链接</b><div class="fill s"></div></div>
+      <div class="box" style="display:flex;gap:8px;margin-top:8px"><span class="tag">↻ 重新生成</span><span class="tag">打开原文 ↗</span></div>
+      <div class="box" style="margin-top:10px;border-color:#dc2626;color:#dc2626">✕ 失败态：真实原因文案 + [重试] [检查当前模型]</div>
+    </div>
+    <div class="anno">
+      <p><b>四段编号</b>：01 一句话核心 / 02 关键事实（bullet 列表，兼容模型返回数组）/ 03 说人话段落 / 04 可点击原文链接。</p>
+      <p><b>引擎条</b>：显示当前默认 provider·模型，点「更换›」开设置抽屉。</p>
+      <p><b>缓存标记</b>：底部灰字「来自缓存（时间）」。</p>
+      <p><b>失败态</b>：显示后端 message（正文抓取失败/未配置模型），给重试与检查入口，不裸奔 502。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. 时间线 / 分类 / 日报 ============ -->
+<section class="sec">
+  <h2>④ 时间线 / 分类 / 日报</h2>
+  <p class="desc">三个列表页共用条目卡，差异在分组维度</p>
+  <div class="grid-note">
+    <div class="frame">
+      <div class="cols">
+        <div style="flex:1">
+          <div class="box"><b>时间线</b>：日期组头「今天 · 20 条」→ 条目卡 → 分页</div>
+          <div class="box" style="margin-top:6px"><b>分类</b>：分类 pill（全部 99 / 模型 40 / 应用 30 …）→ 紧凑行（热度全局排序）</div>
+          <div class="box" style="margin-top:6px"><b>日报</b>：日期标题 → 主题分组头「AI 大模型（7）」→ top20 条目卡</div>
+        </div>
+        <div class="box" style="width:200px">
+          <div class="t">紧凑行示意</div>
+          <div class="row"><span class="tag">12</span><div class="fill m" style="flex:1"></div></div>
+          <div class="row"><span class="tag">13</span><div class="fill s" style="flex:1"></div></div>
+          <div class="row"><span class="tag">14</span><div class="fill l" style="flex:1"></div></div>
+          <div class="arrow">单行 · 小间距 · 无副行</div>
+        </div>
+      </div>
+    </div>
+    <div class="anno">
+      <p><b>时间线</b>：按发布时间倒序；浏览器本地时区按日分组，组头带计数；条目带 HH:MM + 相对时间。</p>
+      <p><b>分类</b>：pill 筛选（计数徽标），列表按衰减热度全局排序，行更紧凑（无汇总副行，按钮内联）。</p>
+      <p><b>日报</b>：今日 top20 按主题分组（服务端分组），组头计数，条目同热榜卡。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. 设置抽屉 ============ -->
+<section class="sec">
+  <h2>⑤ 设置抽屉「模型平台」（右侧滑出 480px）</h2>
+  <p class="desc">默认引擎区 → 已启用（折叠面板）→ 其他平台（默认收起）→ 自定义</p>
+  <div class="grid-note">
+    <div class="frame" style="max-width:460px">
+      <div class="box cols"><b>模型平台</b><span style="margin-left:auto">✕</span></div>
+      <div class="box" style="margin-top:6px">
+        <div class="t">默认解读引擎</div>
+        <div class="row"><span class="tag">provider 下拉</span><span class="tag">设为默认</span></div>
+      </div>
+      <div class="box" style="margin-top:6px">
+        <div class="t">▾ 已启用（1）</div>
+        <div class="box" style="margin-top:4px">
+          <div class="row"><b>DeepSeek</b><span class="tag">默认</span><span>key: sk-f****</span></div>
+          <div class="fill s"></div><div class="fill s"></div><div class="fill s"></div>
+          <div class="row"><span class="tag">保存</span><span class="tag">测试连接</span><span class="tag">删除已保存 Key</span></div>
+        </div>
+      </div>
+      <div class="box" style="margin-top:6px;opacity:.7"><div class="t">▸ 其他平台（6，默认收起）</div></div>
+      <div class="box" style="margin-top:6px"><div class="t">▾ 自定义 provider</div><div class="fill s" style="margin-top:4px"></div></div>
+    </div>
+    <div class="anno">
+      <p><b>结构</b>：抽屉头（标题+关闭）→ 默认引擎（下拉+设为默认）→ 已启用面板（每家：key 密文框 / 接口地址 / 模型名 datalist / 保存 / 测试 / 一键获取模型 / 删除已保存 Key）→ 其他平台收起 → 自定义表单。</p>
+      <p><b>已实现</b>：Key 留空=沿用已保存 Key（改地址仍强制重输）；一键获取模型（后端代理 /api/providers/models）。</p>
+      <p><b>待后端</b>：启用/停用开关（无对应字段，暂不做）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. 色彩规范 ============ -->
+<section class="sec">
+  <h2>⑥ 色彩规范（浅色 / 深色双主题）</h2>
+  <p class="desc">全部颜色收敛为 CSS 变量，html[data-theme] 切换；以下为现行值与用途</p>
+  <style>
+    .pal{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .sw{border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:11px}
+    .sw .c{height:44px;display:flex;align-items:flex-end;padding:4px 6px;color:#fff;font-weight:700;font-size:10px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+    .sw .i{padding:5px 7px;background:#fff}
+    .sw .i b{display:block;font-size:11px}
+    .sw .i span{color:#6b7280;font-size:10px;line-height:1.4}
+    .pal2{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+    .grad{height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10.5px;font-weight:800}
+  </style>
+  <div class="cols" style="gap:16px;flex-wrap:wrap">
+    <div style="flex:1;min-width:340px">
+      <div class="t" style="font-weight:700;margin-bottom:8px">基础色 · 浅色主题（默认·暖纸）</div>
+      <div class="pal">
+        <div class="sw"><div class="c" style="background:#faf9f6;color:#374151;text-shadow:none;border-bottom:1px solid #eee">页面背景</div><div class="i"><b>--bg #FAF9F6</b><span>body 底色（暖纸）</span></div></div>
+        <div class="sw"><div class="c" style="background:#fff;color:#374151;text-shadow:none;border-bottom:1px solid #eee">面板</div><div class="i"><b>--card #FFFFFF</b><span>弹窗·抽屉·设置卡</span></div></div>
+        <div class="sw"><div class="c" style="background:#1c1917">正文</div><div class="i"><b>--text #1C1917</b><span>标题/正文/刊头墨线</span></div></div>
+        <div class="sw"><div class="c" style="background:#78716c;color:#fff">次要文字</div><div class="i"><b>--muted #78716C</b><span>meta/hint/时间</span></div></div>
+        <div class="sw"><div class="c" style="background:#e7e5e4;color:#374151;text-shadow:none">细线</div><div class="i"><b>--border #E7E5E4</b><span>列表分隔线/边框</span></div></div>
+        <div class="sw"><div class="c" style="background:#1d4ed8">主色/链接</div><div class="i"><b>--blue #1D4ED8</b><span>链接·汇总虚线·tab底线</span></div></div>
+        <div class="sw"><div class="c" style="background:#1e40af">主色深</div><div class="i"><b>--blue-dark #1E40AF</b><span>hover 态·kicker</span></div></div>
+        <div class="sw"><div class="c" style="background:#eff3fb;color:#1d4ed8;text-shadow:none">选中底</div><div class="i"><b>--blue-bg #EFF3FB</b><span>少量选中/按钮底（备用）</span></div></div>
+        <div class="sw"><div class="c" style="background:#b45309">热度/前三名</div><div class="i"><b>--amber-text #B45309</b><span>分数·前三排名·lead 分数</span></div></div>
+        <div class="sw"><div class="c" style="background:#d6d3d1;color:#374151;text-shadow:none">排名浅灰</div><div class="i"><b>--rank-dim #D6D3D1</b><span>第 4 名起的衬线排名数字</span></div></div>
+        <div class="sw"><div class="c" style="background:#22c55e">在线/呼吸点</div><div class="i"><b>#22C55E</b><span>utility 呼吸点动画</span></div></div>
+        <div class="sw"><div class="c" style="background:#b91c1c">错误</div><div class="i"><b>#B91C1C</b><span>失败提示/删除按钮</span></div></div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:340px">
+      <div class="t" style="font-weight:700;margin-bottom:8px">基础色 · 深色主题（🌙 切换·暖黑）</div>
+      <div class="pal">
+        <div class="sw"><div class="c" style="background:#16130f">页面背景</div><div class="i"><b>--bg #16130F</b><span>暖黑底</span></div></div>
+        <div class="sw"><div class="c" style="background:#201c17">面板</div><div class="i"><b>--card #201C17</b><span>弹窗·抽屉·设置卡</span></div></div>
+        <div class="sw"><div class="c" style="background:#ece9e4;color:#16130f;text-shadow:none">正文</div><div class="i"><b>--text #ECE9E4</b><span>标题/正文/墨线</span></div></div>
+        <div class="sw"><div class="c" style="background:#a8a29e;color:#16130f;text-shadow:none">次要文字</div><div class="i"><b>--muted #A8A29E</b><span>meta/hint</span></div></div>
+        <div class="sw"><div class="c" style="background:#3a342c">细线</div><div class="i"><b>--border #3A342C</b><span>列表分隔线</span></div></div>
+        <div class="sw"><div class="c" style="background:#8fb1f5;color:#16130f;text-shadow:none">主色</div><div class="i"><b>--blue #8FB1F5</b><span>链接·汇总虚线</span></div></div>
+        <div class="sw"><div class="c" style="background:#c3d4fa;color:#16130f;text-shadow:none">主色深</div><div class="i"><b>--blue-dark #C3D4FA</b><span>hover 态</span></div></div>
+        <div class="sw"><div class="c" style="background:#fbbf24;color:#451a03;text-shadow:none">热度/前三名</div><div class="i"><b>--amber-text #FBBF24</b><span>分数·前三排名</span></div></div>
+        <div class="sw"><div class="c" style="background:#4a4339;color:#ece9e4;text-shadow:none">排名浅灰</div><div class="i"><b>--rank-dim #4A4339</b><span>第 4 名起排名数字</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px">
+    <div class="t" style="font-weight:700;margin-bottom:8px">分类 badge 五色（刊物风＝小字距彩色文字，无底色；括号内为深色主题字色）</div>
+    <div class="pal2">
+      <div class="sw"><div class="c" style="background:#ffffff;color:#1d4ed8;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">AI 大模型</div><div class="i"><b>#1D4ED8</b><span>深:#93C5FD</span></div></div>
+      <div class="sw"><div class="c" style="background:#ffffff;color:#15803d;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">AI 应用</div><div class="i"><b>#15803D</b><span>深:#86EFAC</span></div></div>
+      <div class="sw"><div class="c" style="background:#ffffff;color:#6d28d9;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">政策监管</div><div class="i"><b>#6D28D9</b><span>深:#C4B5FD</span></div></div>
+      <div class="sw"><div class="c" style="background:#ffffff;color:#c2410c;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">融资动态</div><div class="i"><b>#C2410C</b><span>深:#FDBA74</span></div></div>
+      <div class="sw"><div class="c" style="background:#ffffff;color:#0e7490;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">具身机器人</div><div class="i"><b>#0E7490</b><span>深:#67E8F9</span></div></div>
+      <div class="sw"><div class="c" style="background:#ffffff;color:#78716c;text-shadow:none;border-bottom:1px solid #eee;font-size:11px;letter-spacing:.12em">其他</div><div class="i"><b>--muted</b><span>灰系兜底</span></div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px">
+    <div class="t" style="font-weight:700;margin-bottom:8px">排名数字 & 刊首特殊面（刊物风：无渐变，用衬线数字 + 墨线）</div>
+    <div class="pal2" style="grid-template-columns:repeat(4,1fr)">
+      <div><div class="grad" style="background:#ffffff;color:#b45309;font-family:Georgia,serif;font-size:22px;border:1px solid #e7e5e4">01</div><div class="i" style="padding:4px 2px;font-size:10px;color:#6b7280">前三名 #B45309 衬线加粗</div></div>
+      <div><div class="grad" style="background:#ffffff;color:#d6d3d1;font-family:Georgia,serif;font-size:22px;border:1px solid #e7e5e4">04</div><div class="i" style="padding:4px 2px;font-size:10px;color:#6b7280">第 4 名起 #D6D3D1（深:#4A4339）</div></div>
+      <div><div class="grad" style="background:#ffffff;color:#1c1917;font-size:10.5px;border:none;border-bottom:3px solid #1c1917;height:24px">＝＝</div><div class="i" style="padding:4px 2px;font-size:10px;color:#6b7280">刊头/刊首底部 2px 墨线</div></div>
+      <div><div class="grad" style="background:#ffffff;color:#b45309;font-size:12px;border:none;border-left:2px solid #e7e5e4;height:24px">70.4</div><div class="i" style="padding:4px 2px;font-size:10px;color:#6b7280">lead 分数盒：左竖线 + 衬线大数字</div></div>
+    </div>
+  </div>
+
+  <div class="anno" style="margin-top:12px">
+    <p><b>字体</b>：正文系统无衬线；刊头/标题/排名/lead 一律衬线 var(--serif) = Georgia, "Noto Serif SC", "Songti SC", "SimSun", serif。</p>
+    <p><b>使用规则</b>：颜色一律走 CSS 变量（不硬编码 hex），新增组件优先复用语义变量；语义色（成功/错误/在线）不参与主题反转；badge/正文对比度 ≥4.5:1；刊物风整体"少底色、多细线"——能用 1px var(--border) 分隔就不用色块。</p>
+  </div>
+</section>
+
+</body>
+</html>

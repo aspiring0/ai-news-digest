@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>草稿 1 · 刊物风 Editorial</title>
+<style>
+  :root{ --paper:#faf9f6; --ink:#1c1917; --muted:#78716c; --accent:#1d4ed8; --rule:#e7e5e4; --hot:#b45309; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6}
+  .serif{font-family:Georgia,"Noto Serif SC","Songti SC","SimSun",serif}
+  .wrap{max-width:860px;margin:0 auto;padding:0 20px}
+  /* 顶栏 */
+  header{border-bottom:2px solid var(--ink)}
+  .h-in{max-width:860px;margin:0 auto;padding:14px 20px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .brand{font-size:20px;font-weight:800;letter-spacing:.02em}
+  .brand i{color:var(--accent);font-style:normal}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;margin-left:14px;letter-spacing:.08em}
+  nav a.on{color:var(--ink);font-weight:700;border-bottom:2px solid var(--accent);padding-bottom:2px}
+  nav a.set{color:var(--accent)}
+  .util{max-width:860px;margin:0 auto;padding:6px 20px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#16a34a;margin-right:5px;animation:pp 2s infinite}
+  @keyframes pp{0%{box-shadow:0 0 0 0 rgba(22,163,74,.4)}70%{box-shadow:0 0 0 6px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+  .util b{color:var(--ink);font-weight:600}
+  .util .eng{cursor:pointer;border-bottom:1px dotted var(--muted)}
+  /* kicker */
+  .kicker{margin:26px 0 6px;font-size:11px;font-weight:700;letter-spacing:.22em;color:var(--accent)}
+  .lead{display:flex;gap:24px;align-items:flex-start}
+  .lead h1{font-size:27px;line-height:1.35;margin:0 0 8px;font-weight:700}
+  .lead h1 a{color:var(--ink);text-decoration:none}
+  .lead h1 a:hover{color:var(--accent)}
+  .standfirst{color:var(--muted);font-size:13.5px;margin:0 0 10px;max-width:56ch}
+  .why{font-size:13px;color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)}
+  .scorebox{flex-shrink:0;text-align:center;border-left:1px solid var(--rule);padding:4px 0 4px 22px}
+  .scorebox small{display:block;font-size:10px;letter-spacing:.18em;color:var(--muted)}
+  .scorebox b{font-size:30px;color:var(--hot);font-variant-numeric:tabular-nums}
+  /* 筛选 */
+  .chips{display:flex;gap:14px;flex-wrap:wrap;margin:22px 0 0;padding-bottom:10px;border-bottom:1px solid var(--rule);font-size:12.5px}
+  .chips a{color:var(--muted);text-decoration:none;letter-spacing:.04em}
+  .chips a.on{color:var(--ink);font-weight:700;border-bottom:2px solid var(--ink)}
+  .chips span{color:#a8a29e;font-size:11px}
+  /* 条目：无卡片，细线分隔 + 大衬线序号 */
+  .item{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--rule)}
+  .no{flex-shrink:0;width:38px;font-size:26px;font-weight:400;color:#d6d3d1;text-align:right;line-height:1.2}
+  .item.top .no{color:var(--hot);font-weight:700}
+  .bd{flex:1;min-width:0}
+  .t{font-size:16px;font-weight:700;line-height:1.45}
+  .t a{color:var(--ink);text-decoration:none}
+  .t a:hover{color:var(--accent);text-decoration:underline}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--accent);margin-right:8px}
+  .tag.g{color:#15803d}.tag.p{color:#6d28d9}.tag.f{color:#c2410c}.tag.r{color:#0e7490}
+  .m{margin-top:4px;font-size:12px;color:var(--muted)}
+  .m b{color:var(--ink);font-weight:600}
+  .sum{margin-top:6px;font-size:12.5px}
+  .sum a{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent)}
+  .foot{margin:26px 0 40px;font-size:11px;color:#a8a29e;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-in">
+    <div class="brand serif">AI <i>/</i> 资讯聚合</div>
+    <nav><a class="on" href="#">今日热榜</a><a href="#">时间线</a><a href="#">日报</a><a href="#">分类</a><a href="#">收藏</a><a class="set" href="#">⚙ 设置</a></nav>
+  </div>
+</header>
+<div class="util">
+  <span><span class="dot"></span>更新于 <b>18 分钟前</b> · 共 188 条</span>
+  <span>当前引擎：<span class="eng">DeepSeek · deepseek-chat ›</span>　↻ 刷新</span>
+</div>
+<main class="wrap">
+  <div class="kicker">AI / NOW · 高信号 AI 资讯流</div>
+  <section class="lead">
+    <div style="flex:1;min-width:0">
+      <h1 class="serif"><a href="#">Meta 发布 Muse Wonder 系列前沿模型，登陆 Agent Arena 首测</a></h1>
+      <p class="standfirst">Muse Wonder 与 Wonder Full 两款模型今日开放 API，官方称其为迄今最强个人/专业双能模型，Agent Arena 分数即将公布。</p>
+      <a class="why" href="#">为什么重要 · 点开 AI 解读 →</a>
+    </div>
+    <div class="scorebox"><small>衰减热度</small><b>70.4</b></div>
+  </section>
+
+  <div class="chips">
+    <a class="on" href="#">全部 <span>20</span></a><a href="#">AIHOT <span>5</span></a><a href="#">HuggingFace <span>4</span></a>
+    <a href="#">GitHub <span>3</span></a><a href="#">TechCrunch <span>3</span></a><a href="#">量子位 <span>2</span></a>
+  </div>
+
+  <div class="item top">
+    <div class="no serif">01</div>
+    <div class="bd">
+      <div class="t serif"><span class="tag">模型发布</span><a href="#">Meta 发布 Muse Wonder 系列前沿模型</a></div>
+      <div class="m"><b>AIHOT</b> · 08:09 · 1 小时前 · 衰减热度 <b>70.4</b></div>
+      <div class="sum"><a href="#">点开汇总 →</a></div>
+    </div>
+  </div>
+  <div class="item top">
+    <div class="no serif">02</div>
+    <div class="bd">
+      <div class="t serif"><span class="tag g">产品工具</span><a href="#">xAI 推出 The X Subscription，Cursor 并入其中</a></div>
+      <div class="m"><b>AIHOT</b> · 06:56 · 3 小时前 · 衰减热度 <b>64.1</b></div>
+      <div class="sum"><a href="#">点开汇总 →</a></div>
+    </div>
+  </div>
+  <div class="item top">
+    <div class="no serif">03</div>
+    <div class="bd">
+      <div class="t serif"><span class="tag f">行业动态</span><a href="#">微软发布 Maia 300，2027 年扩至多吉瓦级部署</a></div>
+      <div class="m"><b>AIHOT</b> · 05:57 · 4 小时前 · 衰减热度 <b>58.9</b></div>
+      <div class="sum"><a href="#">点开汇总 →</a></div>
+    </div>
+  </div>
+  <div class="item">
+    <div class="no serif">04</div>
+    <div class="bd">
+      <div class="t serif"><span class="tag">模型发布</span><a href="#">Qwen3.8-27B · HuggingFace 热门模型（12.4k likes）</a></div>
+      <div class="m"><b>HuggingFace</b> · 16:05 · 1 小时前 · 衰减热度 <b>52.3</b></div>
+      <div class="sum"><a href="#">点开汇总 →</a></div>
+    </div>
+  </div>
+  <div class="item">
+    <div class="no serif">05</div>
+    <div class="bd">
+      <div class="t serif"><span class="tag p">论文研究</span><a href="#">AWS 提出 priming 方法：预训练 Transformer 改造混合架构，成本降 99%</a></div>
+      <div class="m"><b>AIHOT</b> · 01:48 · 9 小时前 · 衰减热度 <b>44.7</b></div>
+      <div class="sum"><a href="#">点开汇总 →</a></div>
+    </div>
+  </div>
+  <p class="foot">DRAFT 1 · EDITORIAL · 数据每 4 小时刷新 · 保留 14 天</p>
+</main>
+</body>
+</html>

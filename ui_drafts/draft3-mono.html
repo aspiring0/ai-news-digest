@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>草稿 3 · 黑白极简 Mono</title>
+<style>
+  :root{ --ink:#111; --mut:#888; --line:#e5e5e5; --acc:#ff4d00; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:var(--ink);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6}
+  .wrap{max-width:820px;margin:0 auto;padding:0 20px}
+  header{border-bottom:3px solid var(--ink)}
+  .h-in{max-width:820px;margin:0 auto;padding:22px 20px 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .brand{font-size:24px;font-weight:900;letter-spacing:-.01em}
+  .brand i{font-style:normal;color:var(--acc)}
+  nav a{color:var(--ink);text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.14em;margin-left:16px;text-transform:uppercase}
+  nav a.on{color:var(--acc)}
+  .util{max-width:820px;margin:0 auto;padding:7px 20px;display:flex;justify-content:space-between;font-size:11px;letter-spacing:.06em;color:var(--mut);border-bottom:1px solid var(--line)}
+  .util a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--ink)}
+  .pulse{display:inline-block;width:7px;height:7px;background:var(--acc);border-radius:50%;margin-right:6px;animation:pp 1.6s infinite}
+  @keyframes pp{0%,100%{opacity:1}50%{opacity:.3}}
+  .kicker{margin:30px 0 8px;font-size:11px;font-weight:800;letter-spacing:.3em;color:var(--acc)}
+  .lead{border-bottom:1px solid var(--ink);padding-bottom:20px;margin-bottom:4px}
+  .lead h1{font-size:30px;line-height:1.25;margin:0 0 10px;font-weight:900;letter-spacing:-.01em}
+  .lead h1 a{color:var(--ink);text-decoration:none}
+  .lead h1 a:hover{color:var(--acc)}
+  .lead .st{color:var(--mut);font-size:13px;margin:0 0 12px;max-width:58ch}
+  .lead .why{font-size:13px;font-weight:800;color:var(--acc);text-decoration:none;letter-spacing:.04em}
+  .lead .why:hover{text-decoration:underline}
+  .lead .sb{float:right;text-align:center;border:2px solid var(--ink);padding:6px 16px;margin:0 0 8px 20px}
+  .lead .sb small{display:block;font-size:9px;letter-spacing:.2em;color:var(--mut)}
+  .lead .sb b{font-size:26px;font-weight:900}
+  .chips{display:flex;gap:0;margin:18px 0 0;border:1px solid var(--ink)}
+  .chips a{flex:1;text-align:center;padding:7px 0;font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--ink);text-decoration:none;border-right:1px solid var(--ink)}
+  .chips a:last-child{border-right:none}
+  .chips a.on{background:var(--ink);color:#fff}
+  .item{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}
+  .no{flex-shrink:0;width:30px;font-size:15px;font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums;padding-top:1px}
+  .bd{flex:1;min-width:0}
+  .t{font-size:16px;font-weight:650;line-height:1.45}
+  .t a{color:var(--ink);text-decoration:none}
+  .t a:hover{background:#ffeee6}
+  .m{margin-top:3px;font-size:11px;letter-spacing:.1em;color:var(--mut);text-transform:uppercase}
+  .m b{color:var(--ink)}
+  .sum{margin-top:5px}
+  .sum a{display:inline-block;background:var(--ink);color:#fff;font-size:11px;font-weight:700;letter-spacing:.1em;padding:3px 10px;text-decoration:none}
+  .sum a:hover{background:var(--acc)}
+  .foot{margin:24px 0 44px;font-size:10px;letter-spacing:.2em;color:#bbb;text-transform:uppercase}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-in">
+    <div class="brand">AI NEWS<i>.</i></div>
+    <nav><a class="on" href="#">热榜</a><a href="#">时间线</a><a href="#">日报</a><a href="#">分类</a><a href="#">收藏</a><a href="#">设置</a></nav>
+  </div>
+</header>
+<div class="util">
+  <span><span class="pulse"></span>UPDATED 18 MIN AGO · 188 ITEMS</span>
+  <span>ENGINE <a href="#">DEEPSEEK / DEEPSEEK-CHAT ›</a></span>
+</div>
+<main class="wrap">
+  <div class="kicker">AI / NOW — 高信号 AI 资讯流</div>
+  <section class="lead">
+    <div class="sb"><small>衰减热度</small><b>70.4</b></div>
+    <h1><a href="#">Meta 发布 Muse Wonder 系列前沿模型，登陆 Agent Arena 首测</a></h1>
+    <p class="st">Muse Wonder 与 Wonder Full 两款模型今日开放 API，官方称其为迄今最强个人/专业双能模型，Agent Arena 分数即将公布。</p>
+    <a class="why" href="#">为什么重要 · 点开 AI 解读 →</a>
+  </section>
+
+  <div class="chips">
+    <a class="on" href="#">全部 20</a><a href="#">AIHOT 5</a><a href="#">HF 4</a><a href="#">GITHUB 3</a><a href="#">TC 3</a><a href="#">量子位 2</a>
+  </div>
+
+  <div class="item"><div class="no">01</div><div class="bd"><div class="t"><a href="#">Meta 发布 Muse Wonder 系列前沿模型</a></div><div class="m"><b>AIHOT</b> · 08:09 · 1h · 70.4</div><div class="sum"><a href="#">汇总 →</a></div></div></div>
+  <div class="item"><div class="no">02</div><div class="bd"><div class="t"><a href="#">xAI 推出 The X Subscription，Cursor 并入其中</a></div><div class="m"><b>AIHOT</b> · 06:56 · 3h · 64.1</div><div class="sum"><a href="#">汇总 →</a></div></div></div>
+  <div class="item"><div class="no">03</div><div class="bd"><div class="t"><a href="#">微软发布 Maia 300，2027 年扩至多吉瓦级部署</a></div><div class="m"><b>AIHOT</b> · 05:57 · 4h · 58.9</div><div class="sum"><a href="#">汇总 →</a></div></div></div>
+  <div class="item"><div class="no">04</div><div class="bd"><div class="t"><a href="#">Qwen3.8-27B · HuggingFace 热门模型（12.4k likes）</a></div><div class="m"><b>HUGGINGFACE</b> · 16:05 · 1h · 52.3</div><div class="sum"><a href="#">汇总 →</a></div></div></div>
+  <div class="item"><div class="no">05</div><div class="bd"><div class="t"><a href="#">AWS priming 方法：预训练 Transformer 改混合架构，成本降 99%</a></div><div class="m"><b>AIHOT</b> · 01:48 · 9h · 44.7</div><div class="sum"><a href="#">汇总 →</a></div></div></div>
+  <p class="foot">DRAFT 3 · MONO — 每 4 小时刷新 · 保留 14 天</p>
+</main>
+</body>
+</html>
